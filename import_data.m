@@ -13,12 +13,11 @@ function [accel, times, start_time] = import_data(filename, add_start_time)
   start_time = datetime(matches{1}, 'InputFormat', 'yyyy-MM-dd, HH:mm:ss.SSS');
   fclose(fid);
   
-  %options = detectImportOptions(filename, 'CommentStyle', ';');
   data = readtable(filename, 'CommentStyle', ';');
   times = seconds(data.Var1);
   if add_start_time
       times = start_time + seconds(data.Var1);
   end
   
-  accel = [data.Var2 , data.Var3 , data.Var4];
+  accel = [data.Var2, data.Var3, data.Var4] ./ 2048;
 end
