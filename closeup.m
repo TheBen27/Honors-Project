@@ -33,9 +33,13 @@ TIME_SLICES_S = [ ...
 TIME_SLICE = 4;
 
 % Turning these off might result in faster processing.
-plot_raw_accel = false;
+plot_raw_accel = true;
 plot_psds = false;
-plot_spectrograms = true; % Won't work on smaller segments
+plot_spectrograms = false; % Won't work on smaller segments
+if (~(plot_raw_accel || plot_psds || plot_spectrograms))
+    error(['Script is configured to not plot anything. ' ...
+           'Go to closeup.m''s configuration section to change this']);
+end
 
 % Sample rate of the input data. It should really stay on 25 unless you're
 % using another tag.
@@ -54,9 +58,11 @@ spectral_window = sample_rate * 3;
 psd_maxFreq = 2.0;
 
 %% Loading and Preprocessing
-disp(TIME_SLICES_S(TIME_SLICE).description);
-start_time = TIME_SLICES_S(TIME_SLICE).start_time;
-end_time   = TIME_SLICES_S(TIME_SLICE).end_time;
+slice = TIME_SLICES_S(TIME_SLICE);
+disp(slice.description);
+start_time = slice.start_time;
+end_time   = slice.end_time;
+[label_times, label_names] = import_labels(slice.labels_file);
 
 load ACCEL.MAT
 
@@ -66,6 +72,7 @@ times(in_frame) = [];
 
 %% Plotting Raw Acceleration
 if plot_raw_accel
+    
     raw_xlims = [times(1), times(end)]; 
     raw_ylims = [-1.3, 1.3];
     figure;
@@ -76,6 +83,7 @@ if plot_raw_accel
     ylim(raw_ylims);
     xlabel('Time');
     ylabel("g's");
+    plot_labels(label_times, label_names);
 
     subplot(3,1,2);
     plot(times,accel(:,2));
@@ -84,6 +92,7 @@ if plot_raw_accel
     ylim(raw_ylims);
     xlabel('Time');
     ylabel("g's");
+    plot_labels(label_times, {});
 
     subplot(3,1,3);
     plot(times,accel(:,3));
@@ -92,6 +101,7 @@ if plot_raw_accel
     ylim(raw_ylims);
     xlabel('Time');
     ylabel("g's");
+    plot_labels(label_times, {});
 end
 
 % Subtract mean to remove DC offset and center signal
