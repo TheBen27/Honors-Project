@@ -1,51 +1,62 @@
 %% Closeup
 % Looks at a small slice of animal data in accelerometry, FFT, and
 % peaking terms, among other things.
-%
-% 14:07:05 - 14:07:26 (2017-06-15)
-% Shark swims at a constant speed on the outer rim of the pool.
-% By the end of the time frame, it has completed one full revolution.
-%
-% 12:44:49 - 14:17:03 (2017-06-15)
-% Mostly constant swimming with occasional turns and bumps.
-%
-% 16:51:26 - 16:51:31 (2016-06-15)
-% A single, clean 180-degree left turn (doesn't hit the wall).
-%
-% 15:45:08-15:48:10 (2016-06-15)
-% A lot of turning right after the shark was poked.
 %% Configuration
 
-TIME_SLICES = [
-    % Short-term (1 rotation around tank)
-    datetime(2017, 6, 15, 14, 7, 5), datetime(2017, 6, 15, 14, 7, 26);
-    % Long-term view (couple of hours of mostly constant swimming)
-    datetime(2017, 6, 15, 12, 44, 49), datetime(2017, 6, 15, 14, 17, 03);
-    % Single clean turn
-    datetime(2017, 6, 15, 16, 51, 26), datetime(2017, 6, 15, 16, 51, 31);
-    % Lots of turns
-    datetime(2017, 6, 15, 15, 45, 08), datetime(2017, 6, 15, 15, 48, 10)
+TIME_SLICES_S = [ ...
+    struct( ...
+        'description', '1 full constant-speed revolution around tank, no turning', ...
+         'start_time', datetime(2017, 6, 15, 14, 7, 5), ...
+           'end_time', datetime(2017, 6, 15, 14, 7, 26), ...
+        'labels_file', '' ...
+    ), ...
+    struct( ...
+        'description', 'Mostly constant swimming', ...
+         'start_time', datetime(2017, 6, 15, 12, 44, 49), ...
+           'end_time', datetime(2017, 6, 15, 14, 17, 03), ...
+        'labels_file', '' ...
+    ), ...
+    struct( ...
+        'description', 'Single clean 180-degree left turn', ...
+         'start_time', datetime(2017, 6, 15, 16, 51, 26), ...
+           'end_time', datetime(2017, 6, 15, 16, 51, 31), ...
+        'labels_file', '' ...
+    ), ...
+    struct( ...
+        'description', 'A lot of turning after the shark was poked', ...
+         'start_time', datetime(2017, 6, 15, 15, 45, 08), ...
+           'end_time', datetime(2017, 6, 15, 15, 48, 10), ...
+        'labels_file', 'Labels/slice-4.csv' ...
+    ) ...
 ];
 
 TIME_SLICE = 4;
 
-plot_raw_accel = true;
-plot_psds = true;
+% Turning these off might result in faster processing.
+plot_raw_accel = false;
+plot_psds = false;
 plot_spectrograms = true; % Won't work on smaller segments
 
-% General Settings
+% Sample rate of the input data. It should really stay on 25 unless you're
+% using another tag.
 sample_rate = 25;
 
-% Power Spectral Distribution Settings
+% Precision of the PSD and the spectrograms. For spectrograms, this
+% controls the vertical precision; higher values take more CPu.
 psd_nfft = 2048;
-psd_maxFreq = 2.0;
 
-% Spectral window settings
+% Essentially the horizontal precision of the spectrogram. Too high and
+% you'll lose detail; too low and you'll start getting weird artifacts.
+% sample_rate is, I think, a good minimum.
 spectral_window = sample_rate * 3;
 
+% Controls the maximum frequency plotted in the PSDs.
+psd_maxFreq = 2.0;
+
 %% Loading and Preprocessing
-start_time = TIME_SLICES(TIME_SLICE, 1);
-end_time   = TIME_SLICES(TIME_SLICE, 2);
+disp(TIME_SLICES_S(TIME_SLICE).description);
+start_time = TIME_SLICES_S(TIME_SLICE).start_time;
+end_time   = TIME_SLICES_S(TIME_SLICE).end_time;
 
 load ACCEL.MAT
 
@@ -83,26 +94,24 @@ if plot_raw_accel
     ylabel("g's");
 end
 
-%% Get Power Spectral Distributions
-
 % Subtract mean to remove DC offset and center signal
 % TODO Figure out if that idea is at all sensible
 accel_high = accel - repmat(mean(accel),size(accel,1),1);
 
-sample_rate = 25;
-accel_fft = fftshift(fft(accel_high, psd_nfft, 1));
-accel_power = accel_fft .* conj(accel_fft) / (psd_nfft * size(accel,1));
-
-f = sample_rate * (-psd_nfft/2:psd_nfft/2-1)/psd_nfft;
-
-% Remove all negative frequencies
-neg_fs = f < 0;
-f(neg_fs) = [];
-accel_fft(neg_fs,:) = [];
-accel_power(neg_fs,:) = [];
-
-%% Plotting PSDs
+%% Get Power Spectral Distributions
 if plot_psds
+    sample_rate = 25;
+    accel_fft = fftshift(fft(accel_high, psd_nfft, 1));
+    accel_power = accel_fft .* conj(accel_fft) / (psd_nfft * size(accel,1));
+
+    f = sample_rate * (-psd_nfft/2:psd_nfft/2-1)/psd_nfft;
+
+    % Remove all negative frequencies
+    neg_fs = f < 0;
+    f(neg_fs) = [];
+    accel_fft(neg_fs,:) = [];
+    accel_power(neg_fs,:) = [];
+
     figure;
     psd_axes = [0, psd_maxFreq, 0, max(max(accel_power))];
     psd_labels = {'X','Y','Z'};
