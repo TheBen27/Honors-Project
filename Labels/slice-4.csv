@@ -1,0 +1,31 @@
+time,activity,comments
+2017/06/15 15:45:07,L-turn,
+2017/06/15 15:45:09,clockwise,
+2017/06/15 15:45:12,R-turn,gets stuck on the wall
+2017/06/15 15:45:14,anticlockwise,
+2017/06/15 15:45:19,L-turn,
+2017/06/15 15:45:20,clockwise,stops moving at 15:45:25
+2017/06/15 15:45:40,R-turn,
+2017/06/15 15:45:42,anticlockwise,
+2017/06/15 15:45:49,L-turn,
+2017/06/15 15:45:51,clockwise,
+2017/06/15 15:45:58,R-turn,
+2017/06/15 15:45:59,anticlockwise,
+2017/06/15 15:46:04,L-turn,bumps the wall near the end
+2017/06/15 15:46:05,clockwise,
+2017/06/15 15:46:12,R-turn,
+2017/06/15 15:46:14,anticlockwise,
+2017/06/15 15:46:22,L-turn,
+2017/06/15 15:46:24,clockwise,
+2017/06/15 15:46:32,R-turn,hits the wall head-on at 15:46:32
+2017/06/15 15:46:34,anticlockwise,
+2017/06/15 15:46:44,L-turn,
+2017/06/15 15:46:46,clockwise,
+2017/06/15 15:47:21,R-turn,
+2017/06/15 15:47:22,anticlockwise,
+2017/06/15 15:47:30,R-turn,bumps wall a little
+2017/06/15 15:47:33,clockwise,
+2017/06/15 15:47:42,R-turn,
+2017/06/15 15:47:43,anticlockwise,
+2017/06/15 15:47:47,L-turn,
+2017/06/15 15:47:49,clockwise,
