@@ -35,7 +35,8 @@ TIME_SLICE = 4;
 % Turning these off might result in faster processing.
 plot_raw_accel = true;
 plot_psds = false;
-plot_spectrograms = false; % Won't work on smaller segments
+plot_spectrograms = true; % Won't work on smaller segments
+
 if (~(plot_raw_accel || plot_psds || plot_spectrograms))
     error(['Script is configured to not plot anything. ' ...
            'Go to closeup.m''s configuration section to change this']);
@@ -44,6 +45,13 @@ end
 % Sample rate of the input data. It should really stay on 25 unless you're
 % using another tag.
 sample_rate = 25;
+
+% Highpass and lowpass filter controls (for raw accel only)
+accel_filter = false;
+if accel_filter
+   accel_lowpass  = butter(2, (24 / 25), 'low');
+   accel_highpass = butter(2, (1 / 25), 'high'); 
+end
 
 % Precision of the PSD and the spectrograms. For spectrograms, this
 % controls the vertical precision; higher values take more CPu.
@@ -72,12 +80,18 @@ times(in_frame) = [];
 
 %% Plotting Raw Acceleration
 if plot_raw_accel
-    
+    % Filter data
+    if accel_filter
+      accel_filtered = filter(accel_lowpass(1), accel_lowpass(2), ...
+            filter(accel_highpass(1), accel_highpass(2), accel));
+    else
+      accel_filtered = accel;
+    end
+    % Individual subplots
     raw_xlims = [times(1), times(end)]; 
     raw_ylims = [-1.3, 1.3];
-    figure;
     subplot(3,1,1);
-    plot(times,accel(:,1));
+    plot(times,accel_filtered(:,1));
     title('X Acceleration');
     xlim(raw_xlims);
     ylim(raw_ylims);
@@ -86,7 +100,7 @@ if plot_raw_accel
     plot_labels(label_times, label_names);
 
     subplot(3,1,2);
-    plot(times,accel(:,2));
+    plot(times,accel_filtered(:,2));
     title('Y Acceleration');
     xlim(raw_xlims);
     ylim(raw_ylims);
@@ -95,7 +109,7 @@ if plot_raw_accel
     plot_labels(label_times, {});
 
     subplot(3,1,3);
-    plot(times,accel(:,3));
+    plot(times,accel_filtered(:,3));
     title('Z Acceleration');
     xlim(raw_xlims);
     ylim(raw_ylims);
