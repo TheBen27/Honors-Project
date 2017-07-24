@@ -22,6 +22,7 @@ window_size = 25;
 filter_cutoff = 2 / 25;
 
 %% Extract data and lables
+% TODO Refactor using load_accel_slice
 [straight_accel, straight_time] = load_time_slice(datetime(2017, 6, 15, ... 
     12, 44, 49), datetime(2017, 6, 15, 14, 17, 03));
 [curve_accel, curve_time] = load_time_slice(datetime(2017, 6, 15, ... 

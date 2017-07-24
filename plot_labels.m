@@ -1,8 +1,9 @@
 function plot_labels( inds, names )
 %PLOT_LABELS Draw vertical lines + names on the current figure
 % If names's length is less than inds's, it's okays's's
-
-if (size(inds, 2) == 1) % column vector
+if isempty(inds)
+   return 
+elseif (size(inds, 2) == 1) % column vector
     xs = [inds' ; inds'];
 else % row vector
     xs = [inds ; inds];
