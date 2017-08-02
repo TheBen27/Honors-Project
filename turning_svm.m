@@ -67,13 +67,21 @@ test_labels   = r_labels((1 + training_size):length(label_names), :);
 assert(height(training_features) + height(test_features) == length(label_names));
 
 % Train and predict
-svm_trainer = fitcecoc(training_features, training_labels);
-predictions = predict(svm_trainer, test_features);
+svm_template = templateSVM('KernelFunction', 'Gaussian');
+
+svm_trainer = fitcecoc(training_features, training_labels, 'Learners', svm_template);
+training_predictions = predict(svm_trainer, training_features);
+test_predictions = predict(svm_trainer, test_features);
 
 % Accuracy
 fprintf("\nACCURACY\n\n");
-test_accuracy = sum(test_labels == predictions) / length(predictions);
+test_accuracy = sum(test_labels == test_predictions) ...
+    / length(test_predictions);
+training_accuracy = sum(training_labels == training_predictions) ...
+    / length(training_predictions);
+
 disp("Test accuracy: " + test_accuracy);
+disp("Training accuracy: " + training_accuracy);
 disp("Accuracy of a dice-throwing monkey: " + 1 / length(categories(label_names)));
 
 % Gory details
@@ -81,7 +89,7 @@ fprintf("\nGORY DETAILS\n\n");
 cats = categories(label_names);
 for i=1:length(cats)
     cat = string(cats{i});
-    actual_hits = sum(cat == predictions);
+    actual_hits = sum(cat == test_predictions);
     expected_hits = sum(cat == test_labels);
     disp("Number of hits for " + cats{i} + ": " + actual_hits ...
         + " (Expected " + expected_hits + ")");
