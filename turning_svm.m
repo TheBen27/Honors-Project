@@ -27,9 +27,9 @@ window_overlap = 8;
     load_accel_slice_windowed(TIME_SLICES(accel_slice), window_size, window_overlap);
 
 %% Make features
-means_x = feature_accel(accel, times, 1);
-means_y = feature_accel(accel, times, 1);
-means_z = feature_accel(accel, times, 1);
+means_x = feature_accel(accel, 1, 3);
+means_y = feature_accel(accel, 2, 3);
+means_z = feature_accel(accel, 3, 3);
 
 features = table(means_x, means_y, means_z);
 
