@@ -31,6 +31,14 @@ tails = feature_tailbeat(accel, 1024, 25, 0.8, 1.6);
 features = table(means_x, means_y, means_z, ...
     tails(:, 1), tails(:, 2), tails(:, 3));
 
+% Normalize features to [-1, 1]
+for col = 1:size(features, 2)
+    feat = features{:, col};
+    fmax = max(feat);
+    fmin = min(feat);
+    features{:, col} = 2 * (feat - fmin) / (fmax - fmin) - 1;
+end
+
 %% Get Accuracy
 
 % Shuffle features/labels to randomize training set and test set
