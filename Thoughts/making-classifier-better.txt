@@ -1,0 +1,50 @@
+I WANT TO
+
+Make my classifier better.
+
+HOW TO DO
+
+* Add more features
+* Fine-tune your features so that they're more accurate and effective
+* Choose a classifier that suits your needs best
+
+ADD MORE FEATURES
+I've reached the limits of smart solutions to my problem, so I can
+start using dumb ones instead - things like average X, Y, Z acceleration.
+
+I will still need a way to test these features to see if they even 
+matter, unless I use the special feature selection algorithm that Zhou 
+talked about.
+
+FINE-TUNE EXISTING FEATURES
+We should make features first and then start to weed them out, I think,
+mainly because having more than two features will probably increase
+accuracy no matter what we do.
+
+CHOOSE A DIFFERENT CLASSIFIER
+Zhou suggested an SVM with a special form of feature detection that
+weights features accordingly. I would have gone with a neural network
+myself, but I think he knows more about machine learning than I do.
+
+---
+
+IN ANY CASE
+To set any of these things up, I need a way to test the accuracy of
+my algorithm and how individual features contribute to this. I could
+either:
+
+* See how accurate each feature alone is in determining accuracy
+* Combine features
+
+But I don't think simple cross-correlation/logistic regression is appropriate.
+We should use a real SVM with cross-validation to test this.
+
+We're going to be including more behaviors soon, so we should probably set our
+SVM script up for multi-class classification. On the other hand, it looks like
+it isn't that hard to change it later. To prevent bloat and enable code reuse,
+we should put our feature detection code into separate functions.
+
+If functions received each input as a matrix of window-size column vectors, we
+wouldn't be able to send them windows of different size. This matters because
+we usually can't split the data into even windows. Even if we can, there's the
+issue of window overlap.
