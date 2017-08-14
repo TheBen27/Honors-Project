@@ -8,7 +8,7 @@
 % be better than that of a dice-throwing monkey.
 %% Configuration
 
-slice_name = 'medley-1';
+slice_name = {'many-turns', 'medley-1'};
 
 % Each window has (window_size + window_overlap) samples. Overlapping
 % samples are shared with a window's neighbors.

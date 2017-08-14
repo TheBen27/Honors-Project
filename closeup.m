@@ -4,12 +4,12 @@
 %% Configuration
 
 % Name of the slice from SLICES.MAT
-slice_name = 'more-revolutions';
+slice_name = 'one-revolution';
 
 % Turning these off might result in faster processing.
 plot_raw_accel = true;
 plot_psds = false;
-plot_spectrograms = true; % Won't work on smaller segments
+plot_spectrograms = false; % Won't work on smaller segments
 
 if (~(plot_raw_accel || plot_psds || plot_spectrograms))
     error(['Script is configured to not plot anything. ' ...
