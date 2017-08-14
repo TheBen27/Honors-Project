@@ -8,11 +8,7 @@
 % be better than that of a dice-throwing monkey.
 %% Configuration
 
-% Load the needed data and labels here.
-load('SLICES.MAT'); % loads TIME_SLICES
-
-% Index of the data slice in SLICES.MAT to use
-accel_slice = 5;
+slice_name = 'medley-1';
 
 % Each window has (window_size + window_overlap) samples. Overlapping
 % samples are shared with a window's neighbors.
@@ -24,7 +20,7 @@ window_overlap = 16;
 
 %% Split and label data
 [accel, times, label_times, label_names] = ... 
-    load_accel_slice_windowed(TIME_SLICES(accel_slice), window_size, window_overlap);
+    load_accel_slice_windowed(slice_name, window_size, window_overlap);
 
 %% Make features
 means_x = feature_accel(accel, 1, 3);

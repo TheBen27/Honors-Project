@@ -2,13 +2,14 @@
 % Looks at a small slice of animal data in accelerometry, FFT, and
 % peaking terms, among other things.
 %% Configuration
-load('SLICES.MAT'); % Loads TIME_SLICES
-TIME_SLICE = 1;     % Index of the time slices to use, look at TIME_SLICES for more
+
+% Name of the slice from SLICES.MAT
+slice_name = 'more-revolutions';
 
 % Turning these off might result in faster processing.
-plot_raw_accel = false;
-plot_psds = true;
-plot_spectrograms = false; % Won't work on smaller segments
+plot_raw_accel = true;
+plot_psds = false;
+plot_spectrograms = true; % Won't work on smaller segments
 
 if (~(plot_raw_accel || plot_psds || plot_spectrograms))
     error(['Script is configured to not plot anything. ' ...
@@ -39,7 +40,7 @@ spectral_window = sample_rate * 3;
 psd_maxFreq = 2.0;
 
 %% Loading and Preprocessing
-[accel, times, label_times, label_names] = load_accel_slice(TIME_SLICES(TIME_SLICE));
+[accel, times, label_times, label_names] = load_accel_slice(slice_name);
 
 %% Plotting Raw Acceleration
 if plot_raw_accel

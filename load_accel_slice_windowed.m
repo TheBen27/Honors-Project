@@ -1,4 +1,5 @@
-function [ accel, times, label_times, label_names ] = load_accel_slice_windowed( slice, window_size, window_overlap )
+function [ accel, times, label_times, label_names ] = ...
+    load_accel_slice_windowed( slice_name, window_size, window_overlap )
 % LOAD_ACCEL_SLICE_WINDOWED Convert a slice of accelerometer data and split
 % it into overlapping windows.
 %
@@ -10,7 +11,7 @@ function [ accel, times, label_times, label_names ] = load_accel_slice_windowed(
 % Any data at the end of the slice that doesn't cleanly fit into a window
 % will be lopped off.
 
-[accel_r, times_r, label_times_r, label_names_r] = load_accel_slice(slice);
+[accel_r, times_r, label_times_r, label_names_r] = load_accel_slice(slice_name);
 label_names_r = categorical(label_names_r);
 % Get number of windows and window size
 total_window_size = window_size + 2 * window_overlap;

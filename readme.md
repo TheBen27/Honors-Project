@@ -20,6 +20,11 @@ of means; the second tries to use the various feature files
 (`feature_accel.m`, `feature_analysis.m`, ...) to generate an SVM
 predictor.
 
+SLICES.MAT contains various "data slices" - these are pieces of ACCEL.MAT,
+often with an accompanying label file or description. You'll use these
+when loading chunks of data via `load_accel_slice.m` or
+`load_accel_slice_windowed.m`.
+
 ## What isn't here?
 
 Due to space considerations, most of the raw data for this project
