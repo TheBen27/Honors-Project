@@ -3,12 +3,12 @@
 % peaking terms, among other things.
 %% Configuration
 load('SLICES.MAT'); % Loads TIME_SLICES
-TIME_SLICE = 2;     % Index of the time slices to use, look at TIME_SLICES for more
+TIME_SLICE = 1;     % Index of the time slices to use, look at TIME_SLICES for more
 
 % Turning these off might result in faster processing.
 plot_raw_accel = false;
-plot_psds = false;
-plot_spectrograms = true; % Won't work on smaller segments
+plot_psds = true;
+plot_spectrograms = false; % Won't work on smaller segments
 
 if (~(plot_raw_accel || plot_psds || plot_spectrograms))
     error(['Script is configured to not plot anything. ' ...

@@ -19,8 +19,8 @@ accel_slice = 5;
 %
 % Data at the end of the set that does not fit squarely within a window is
 % cut off.
-window_size = 25 - 16;
-window_overlap = 8;
+window_size = 72 - 16;
+window_overlap = 16;
 
 %% Split and label data
 [accel, times, label_times, label_names] = ... 
@@ -30,8 +30,10 @@ window_overlap = 8;
 means_x = feature_accel(accel, 1, 3);
 means_y = feature_accel(accel, 2, 3);
 means_z = feature_accel(accel, 3, 3);
+tails = feature_tailbeat(accel, 1024, 25, 0.8, 1.6);
 
-features = table(means_x, means_y, means_z);
+features = table(means_x, means_y, means_z, ...
+    tails(:, 1), tails(:, 2), tails(:, 3));
 
 %% Get Accuracy
 

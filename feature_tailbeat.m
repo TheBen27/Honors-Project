@@ -1,30 +1,32 @@
-function [ freqs, amps ] = feature_tailbeat( accel )
+function [ distinctiveness ] = feature_tailbeat( accel, nfft, ...
+    sample_rate, high_pass, low_pass)
 %FEATURE_TAILBEAT Try to estimate the tailbeat frequency of a window of data.
 %
 % accel is organized in windows (m entries/window x 3 columns x n windows).
-% freqs and amps will both be (n x 1) vectors.
+% both outputs are (n x 1) vectors.
 %
-% As far as I can tell, tailbeat frequency shows up strongly in the X axis
-% of the tag. On a PSD, this manifests in the form of a peak around
-% 1Hz - but since this is dependent somewhat on the shark's speed,
-% we can vary it between about 1 and 2 Hz.
-%
-% For the sake of completeness, we're also going to return the
-% second-biggest peak in this range along with the amplitudes of each peak.
-% (TODO)
+% distinctiveness is a twofold measure. It scores very low if the closest
+% thing we could find to a "tailbeat" is too fast or slow to be reasonable.
+% It also scores low if it's not much higher than the other frequencies
+% (e.g. it might just be noise).
 
-% ORIGINAL CODE
-% psd_nfft = 1024
-% sample_rate = 25;
-% accel_fft = fftshift(fft(accel_high, psd_nfft, 1));
-% accel_power = accel_fft .* conj(accel_fft) / (psd_nfft * size(accel,1));
-% 
-% f = sample_rate * (-psd_nfft/2:psd_nfft/2-1)/psd_nfft;
-% 
-% % Remove all negative frequencies
-% neg_fs = f < 0;
-% f(neg_fs) = [];
-% accel_fft(neg_fs,:) = [];
-% accel_power(neg_fs,:) = [];
+% Get PSD and filter frequencies via brickwall
+accel_fft = fftshift(fft(accel,  nfft, 1));
+accel_pow = accel_fft .* conj(accel_fft) / (nfft * size(accel, 1));
+
+freqs = sample_rate * (-nfft/2:nfft/2-1)/nfft;
+filt_inds = (freqs > high_pass) & (freqs < low_pass);
+
+accel_pow(filt_inds, :, :) = [];
+freqs = freqs(filt_inds);
+[tail_amp, tail_ind] = max(accel_pow, [], 1);
+
+energy = mean(accel_pow, 1);
+distinctiveness = tail_amp ./ energy;
+
+num_windows = size(distinctiveness, 3);
+num_axes = size(distinctiveness, 2);
+distinctiveness = reshape(distinctiveness, num_windows, num_axes, 1);
+
 end
 
