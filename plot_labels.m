@@ -1,6 +1,7 @@
-function plot_labels( inds, names )
+function plot_labels( inds, names, varargin )
 %PLOT_LABELS Draw vertical lines + names on the current figure
 % If names's length is less than inds's, it's okays's's
+% If varargin is specified, we use it to determine the label line color
 if isempty(inds)
    return 
 elseif (size(inds, 2) == 1) % column vector
@@ -13,7 +14,13 @@ f = gcf();
 y = f.CurrentAxes.YLim';
 ys = repmat(y, 1, length(inds));
 
-line(xs, ys, 'Color', 'Yellow');
+if isempty(varargin)
+    line_color = 'Yellow';
+else
+    line_color = varargin{1};
+end
+
+line(xs, ys, 'Color', line_color);
 
 txs = xs(1, 1:length(names));
 tys = ys(2, 1:length(names));

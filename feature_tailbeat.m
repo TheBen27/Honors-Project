@@ -1,5 +1,5 @@
-function [ distinctiveness ] = feature_tailbeat( accel, nfft, ...
-    sample_rate, high_pass, low_pass)
+function [ distinctiveness, frequency ] = feature_tailbeat( ...
+    accel, nfft, sample_rate, high_pass, low_pass)
 %FEATURE_TAILBEAT Try to estimate the tailbeat frequency of a window of data.
 %
 % accel is organized in windows (m entries/window x 3 columns x n windows).
@@ -18,9 +18,12 @@ freqs = sample_rate * (-nfft/2:nfft/2-1)/nfft;
 filt_inds = (freqs > high_pass) & (freqs < low_pass);
 
 accel_pow(filt_inds, :, :) = [];
-freqs = freqs(filt_inds);
+freqs(filt_inds) = [];
 [tail_amp, tail_ind] = max(accel_pow, [], 1);
 
+frequency = freqs(tail_ind);
+
+% TODO get energy from each window?
 energy = mean(accel_pow, 1);
 distinctiveness = tail_amp ./ energy;
 

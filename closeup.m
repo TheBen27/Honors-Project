@@ -4,7 +4,7 @@
 %% Configuration
 
 % Name of the slice from SLICES.MAT
-slice_name = 'one-revolution';
+slice_name = 'windowing-test-1';
 
 % Turning these off might result in faster processing.
 plot_raw_accel = true;
@@ -19,6 +19,12 @@ end
 % Sample rate of the input data. It should really stay on 25 unless you're
 % using another tag.
 sample_rate = 25;
+
+% Plot the positions of each window given some size and overlap.
+% Green lines mark the beginning of a window, red lines the end
+plot_windows = true;
+window_size = 25 - 8;
+window_overlap = 8;
 
 % Highpass and lowpass filter controls (for raw accel only)
 accel_filter = false;
@@ -44,6 +50,21 @@ psd_maxFreq = 2.0;
 
 %% Plotting Raw Acceleration
 if plot_raw_accel
+    % Get windows
+    if plot_windows
+        num_windows = floor((length(accel) - window_overlap) / ...
+            (window_overlap + window_size));
+        windows = 1:num_windows;
+        window_starts_is = (windows - 1) * (window_overlap + window_size) + 1;
+        window_ends_is = window_starts_is + (window_size + window_overlap * 2) - 1;
+        
+        start_time = times(1);
+        window_starts = start_time + seconds(window_starts_is / sample_rate);
+        window_ends = start_time + seconds(window_ends_is / sample_rate);
+    else
+        window_starts = []
+        window_ends = []
+    end
     % Filter data
     if accel_filter
       accel_filtered = filter(accel_lowpass(1), accel_lowpass(2), ...
@@ -62,7 +83,9 @@ if plot_raw_accel
     xlabel('Time');
     ylabel("g's");
     plot_labels(label_times, label_names);
-
+    plot_labels(window_starts, {}, 'Green');
+    plot_labels(window_ends, {}, 'Red');
+    
     subplot(3,1,2);
     plot(times,accel_filtered(:,2));
     title('Y Acceleration');
@@ -71,6 +94,8 @@ if plot_raw_accel
     xlabel('Time');
     ylabel("g's");
     plot_labels(label_times, {});
+    plot_labels(window_starts, {}, 'Green');
+    plot_labels(window_ends, {}, 'Red');
 
     subplot(3,1,3);
     plot(times,accel_filtered(:,3));
@@ -80,6 +105,8 @@ if plot_raw_accel
     xlabel('Time');
     ylabel("g's");
     plot_labels(label_times, {});
+    plot_labels(window_starts, {}, 'Green');
+    plot_labels(window_ends, {}, 'Red');
 end
 
 % Subtract mean to remove DC offset and center signal

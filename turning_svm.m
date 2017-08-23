@@ -8,6 +8,7 @@
 % be better than that of a dice-throwing monkey.
 %% Configuration
 
+% Cell array of data slices to use. These should all be labeled.
 slice_name = {'many-turns', 'medley-1'};
 
 % Each window has (window_size + window_overlap) samples. Overlapping
@@ -15,10 +16,15 @@ slice_name = {'many-turns', 'medley-1'};
 %
 % Data at the end of the set that does not fit squarely within a window is
 % cut off.
-window_size = 72 - 16;
-window_overlap = 16;
+window_size = 25 - 8;
+window_overlap = 8;
 
-%% Split and label data
+% An experimental feature that ensures that all classes have approximately
+% the same number of examples. The idea is that the SVM can no longer rely
+% on the overwhelming likelihood of one class over another.
+% cull_overly_frequent_classes = true;
+
+%% Load and preprocess data
 [accel, times, label_times, label_names] = ... 
     load_accel_slice_windowed(slice_name, window_size, window_overlap);
 
@@ -26,10 +32,11 @@ window_overlap = 16;
 means_x = feature_accel(accel, 1, 3);
 means_y = feature_accel(accel, 2, 3);
 means_z = feature_accel(accel, 3, 3);
+[pitch, roll] = feature_static_accel(accel, 25, 3, 0.6);
 tails = feature_tailbeat(accel, 1024, 25, 0.8, 1.6);
 
 features = table(means_x, means_y, means_z, ...
-    tails(:, 1), tails(:, 2), tails(:, 3));
+    tails(:, 1), tails(:, 2), tails(:, 3), pitch, roll);
 
 % Normalize features to [-1, 1]
 for col = 1:size(features, 2)
