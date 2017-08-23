@@ -19,16 +19,20 @@ slice_name = {'many-turns', 'medley-1'};
 window_size = 25 - 8;
 window_overlap = 8;
 
-% An experimental feature that ensures that all classes have approximately
-% the same number of examples. The idea is that the SVM can no longer rely
-% on the overwhelming likelihood of one class over another.
-% cull_overly_frequent_classes = true;
+% An experimental feature that overweights very unlikely features.
+% Entries with this label will be duplicated N times according to that
+% factor. Entries without the label will not be duplicated
+weight_map = [
+    {'anticlockwise', 4}; ...
+    {'R-turn', 40}; ...
+    {'L-turn', 40}
+];
 
 %% Load and preprocess data
 [accel, times, label_times, label_names] = ... 
     load_accel_slice_windowed(slice_name, window_size, window_overlap);
 
-%% Make features
+%% Make and Process features
 means_x = feature_accel(accel, 1, 3);
 means_y = feature_accel(accel, 2, 3);
 means_z = feature_accel(accel, 3, 3);
@@ -46,12 +50,28 @@ for col = 1:size(features, 2)
     features{:, col} = 2 * (feat - fmin) / (fmax - fmin) - 1;
 end
 
-%% Get Accuracy
+% Duplicate classes that need overweighting
+dupe_features = table();
+dupe_labels = [];
+for wi = 1:length(weight_map)
+   label = weight_map(wi, 1);
+   freq = weight_map{wi, 2} - 1;
+   if freq > 0
+       inds = (label_names == label);
+       dupe_features = [dupe_features ; repmat(features(inds,:), freq, 1)];
+       dupe_labels = [dupe_labels ; repmat(label_names(inds), freq, 1)]; 
+   end
+end
+
+features = [features ; dupe_features];
+label_names = [label_names ; dupe_labels];
 
 % Shuffle features/labels to randomize training set and test set
 rand_inds = randperm(height(features));
 r_features = features(rand_inds, :);
 r_labels = label_names(rand_inds);
+
+%% Get Accuracy
 
 % Split into training set and test set
 training_size = floor(length(label_names) * 0.8);
