@@ -16,8 +16,8 @@ slice_name = {'many-turns', 'medley-1'};
 %
 % Data at the end of the set that does not fit squarely within a window is
 % cut off.
-window_size = 25 - 8;
-window_overlap = 8;
+window_size = 10;
+window_overlap = 20;
 
 % An experimental feature that overweights very unlikely features.
 % Entries with this label will be duplicated N times according to that

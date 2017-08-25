@@ -11,10 +11,10 @@
 load('SLICES.MAT'); % loads TIME_SLICES
 
 slice_name = {'many-turns', 'medley-1'};
-window_size = 24;
+window_size = 16;
 window_overlap = 8;
 
-feature = @(acc) feature_tailbeat(acc(:, 2, :), 1024, 25, 0.8, 1.8);
+feature = @(acc) feature_accel(acc, 2, 3);
 
 [accel, times, label_times, label_names] = ...
     load_accel_slice_windowed(slice_name, window_size, ...

@@ -4,7 +4,7 @@
 %% Configuration
 
 % Name of the slice from SLICES.MAT
-slice_name = 'windowing-test-1';
+slice_name = 'medley-1';
 
 % Turning these off might result in faster processing.
 plot_raw_accel = true;
@@ -23,7 +23,7 @@ sample_rate = 25;
 % Plot the positions of each window given some size and overlap.
 % Green lines mark the beginning of a window, red lines the end
 plot_windows = true;
-window_size = 25 - 8;
+window_size = 25;
 window_overlap = 8;
 
 % Highpass and lowpass filter controls (for raw accel only)
@@ -47,6 +47,11 @@ psd_maxFreq = 2.0;
 
 %% Loading and Preprocessing
 [accel, times, label_times, label_names] = load_accel_slice(slice_name);
+if plot_windows
+    [~, ~, ~, window_names] = load_accel_slice_windowed(slice_name, window_size, window_overlap);
+else
+    window_names = [];
+end
 
 %% Plotting Raw Acceleration
 if plot_raw_accel
@@ -83,7 +88,7 @@ if plot_raw_accel
     xlabel('Time');
     ylabel("g's");
     plot_labels(label_times, label_names);
-    plot_labels(window_starts, {}, 'Green');
+    plot_labels(window_starts, char(window_names), 'Green');
     plot_labels(window_ends, {}, 'Red');
     
     subplot(3,1,2);
