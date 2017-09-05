@@ -42,14 +42,6 @@ tails = feature_tailbeat(accel, 1024, 25, 0.8, 1.6);
 features = table(means_x, means_y, means_z, ...
     tails(:, 1), tails(:, 2), tails(:, 3), pitch, roll);
 
-% Normalize features to [-1, 1]
-for col = 1:size(features, 2)
-    feat = features{:, col};
-    fmax = max(feat);
-    fmin = min(feat);
-    features{:, col} = 2 * (feat - fmin) / (fmax - fmin) - 1;
-end
-
 % Duplicate classes that need overweighting
 dupe_features = table();
 dupe_labels = [];
@@ -81,6 +73,12 @@ test_features = r_features((1 + training_size):length(label_names), :);
 test_labels   = r_labels((1 + training_size):length(label_names), :);
 
 assert(height(training_features) + height(test_features) == length(label_names));
+
+% Standardize variables - use Training Set's mean and std. dev.
+training_mean = mean(training_features{:,:});
+training_std = std(training_features{:,:});
+training_features{:,:} = (training_features{:,:} - training_mean) ./ training_std;
+test_features{:,:} = (test_features{:,:} - training_mean) ./ training_std;
 
 % Train and predict
 svm_template = templateSVM('KernelFunction', 'Gaussian');
