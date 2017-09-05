@@ -9,7 +9,7 @@
 %% Configuration
 
 % Cell array of data slices to use. These should all be labeled.
-slice_name = {'many-turns', 'medley-1'};
+slice_name = {'many-turns', 'medley-1', 'medley-2'};
 
 % Each window has (window_size + window_overlap) samples. Overlapping
 % samples are shared with a window's neighbors.

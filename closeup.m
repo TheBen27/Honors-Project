@@ -4,7 +4,7 @@
 %% Configuration
 
 % Name of the slice from SLICES.MAT
-slice_name = 'medley-1';
+slice_name = 'medley-2';
 
 % Turning these off might result in faster processing.
 plot_raw_accel = true;
@@ -22,7 +22,7 @@ sample_rate = 25;
 
 % Plot the positions of each window given some size and overlap.
 % Green lines mark the beginning of a window, red lines the end
-plot_windows = true;
+plot_windows = false;
 window_size = 25;
 window_overlap = 8;
 
