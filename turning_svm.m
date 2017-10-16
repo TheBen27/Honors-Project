@@ -8,6 +8,9 @@
 % be better than that of a dice-throwing monkey.
 %% Configuration
 
+% Save the seed so we get consistent results
+rng(3);
+
 % Cell array of data slices to use. These should all be labeled.
 slice_name = {'many-turns', 'medley-1', 'medley-2'};
 
@@ -16,16 +19,16 @@ slice_name = {'many-turns', 'medley-1', 'medley-2'};
 %
 % Data at the end of the set that does not fit squarely within a window is
 % cut off.
-window_size = 10;
+window_size = 20;
 window_overlap = 20;
 
 % An experimental feature that overweights very unlikely features.
 % Entries with this label will be duplicated N times according to that
 % factor. Entries without the label will not be duplicated
 weight_map = [
-    {'anticlockwise', 4}; ...
-    {'R-turn', 40}; ...
-    {'L-turn', 40}
+    {'anticlockwise', 0}; ...
+    {'R-turn', 0}; ...
+    {'L-turn', 0}
 ];
 
 %% Load and preprocess data
@@ -41,22 +44,6 @@ tails = feature_tailbeat(accel, 1024, 25, 0.8, 1.6);
 
 features = table(means_x, means_y, means_z, ...
     tails(:, 1), tails(:, 2), tails(:, 3), pitch, roll);
-
-% Duplicate classes that need overweighting
-dupe_features = table();
-dupe_labels = [];
-for wi = 1:length(weight_map)
-   label = weight_map(wi, 1);
-   freq = weight_map{wi, 2} - 1;
-   if freq > 0
-       inds = (label_names == label);
-       dupe_features = [dupe_features ; repmat(features(inds,:), freq, 1)];
-       dupe_labels = [dupe_labels ; repmat(label_names(inds), freq, 1)]; 
-   end
-end
-
-features = [features ; dupe_features];
-label_names = [label_names ; dupe_labels];
 
 % Shuffle features/labels to randomize training set and test set
 rand_inds = randperm(height(features));
@@ -80,6 +67,22 @@ training_std = std(training_features{:,:});
 training_features{:,:} = (training_features{:,:} - training_mean) ./ training_std;
 test_features{:,:} = (test_features{:,:} - training_mean) ./ training_std;
 
+% Oversample less common classes in training set only
+dupe_features = table();
+dupe_labels = [];
+for wi = 1:length(weight_map)
+   label = weight_map(wi, 1);
+   freq = weight_map{wi, 2} - 1;
+   if freq > 0
+       inds = (training_labels == label);
+       dupe_features = [dupe_features ; repmat(training_features(inds,:), freq, 1)];
+       dupe_labels = [dupe_labels ; repmat(training_labels(inds), freq, 1)]; 
+   end
+end
+
+training_features = [features ; dupe_features];
+training_labels = [label_names ; dupe_labels];
+
 % Train and predict
 svm_template = templateSVM('KernelFunction', 'Gaussian');
 
@@ -101,10 +104,26 @@ disp("Accuracy of a dice-throwing monkey: " + 1 / length(categories(label_names)
 % Gory details
 fprintf("\nGORY DETAILS\n\n");
 cats = categories(label_names);
+precisions = zeros(size(cats));
+recalls = zeros(size(cats));
+
 for i=1:length(cats)
     cat = string(cats{i});
-    actual_hits = sum(cat == test_predictions);
-    expected_hits = sum(cat == test_labels);
-    disp("Number of hits for " + cats{i} + ": " + actual_hits ...
-        + " (Expected " + expected_hits + ")");
+    actual   = (cat == test_predictions);
+    expected = (cat == test_labels);
+    
+    true_positives  = sum(actual & expected);
+    false_positives = sum(actual & ~expected);
+    false_negatives = sum(expected & ~actual);
+    
+    % Precision is a measure of quality - if the machine thought it
+    % was this class, was it right?
+    precisions(i) = true_positives / (true_positives + false_positives);
+    % Recall is a measurement of quantity - if an example was of this
+    % class, did the machine pick it?
+    recalls(i)    = true_positives / (true_positives + false_negatives);
 end
+
+results = table(cats, precisions, recalls);
+results.Properties.VariableNames = {'Classes', 'Precision', 'Recall'};
+disp(results);

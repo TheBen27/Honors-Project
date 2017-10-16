@@ -4,7 +4,7 @@
 %% Configuration
 
 % Name of the slice from SLICES.MAT
-slice_name = 'medley-2';
+slice_name = 'medley-1';
 
 % Turning these off might result in faster processing.
 plot_raw_accel = true;
