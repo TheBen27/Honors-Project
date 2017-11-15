@@ -29,14 +29,7 @@ window_overlap = 8;
     load_accel_slice_windowed(slice_name, window_size, window_overlap);
 
 %% Make features
-means_x = feature_accel(accel, 1, 3);
-means_y = feature_accel(accel, 2, 3);
-means_z = feature_accel(accel, 3, 3);
-[pitch, roll] = feature_static_accel(accel, 25, 3, 0.6);
-tails = feature_tailbeat(accel, 1024, 25, 0.8, 1.6);
-
-features = table(means_x, means_y, means_z, ...
-    tails(:, 1), tails(:, 2), tails(:, 3), pitch, roll);
+features = generate_features(accel, true);
 
 % Normalize features to [-1, 1]
 for col = 1:size(features, 2)
@@ -69,24 +62,7 @@ svm_trainer = fitcecoc(training_features, training_labels, 'Learners', svm_templ
 training_predictions = predict(svm_trainer, training_features);
 test_predictions = predict(svm_trainer, test_features);
 
-% Accuracy
-fprintf("\nACCURACY\n\n");
-test_accuracy = sum(test_labels == test_predictions) ...
-    / length(test_predictions);
-training_accuracy = sum(training_labels == training_predictions) ...
-    / length(training_predictions);
+% Print precision, recall, and confusion matrix
+% precision = P(is true | was thought to be true)
+% recall = P(was thought to be true | is true)
 
-disp("Test accuracy: " + test_accuracy);
-disp("Training accuracy: " + training_accuracy);
-disp("Accuracy of a dice-throwing monkey: " + 1 / length(categories(label_names)));
-
-% Gory details
-fprintf("\nGORY DETAILS\n\n");
-cats = categories(label_names);
-for i=1:length(cats)
-    cat = string(cats{i});
-    actual_hits = sum(cat == test_predictions);
-    expected_hits = sum(cat == test_labels);
-    disp("Number of hits for " + cats{i} + ": " + actual_hits ...
-        + " (Expected " + expected_hits + ")");
-end
