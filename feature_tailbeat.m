@@ -30,6 +30,7 @@ distinctiveness = tail_amp ./ energy;
 num_windows = size(distinctiveness, 3);
 num_axes = size(distinctiveness, 2);
 distinctiveness = reshape(distinctiveness, num_windows, num_axes, 1);
+frequency = reshape(frequency, num_windows, num_axes, 1);
 
 end
 

@@ -14,6 +14,8 @@ rng(3);
 % Cell array of data slices to use. These should all be labeled.
 slice_name = {'many-turns', 'medley-1', 'medley-2'};
 
+sample_rate = 20;
+
 % Each window has (window_size + window_overlap) samples. Overlapping
 % samples are shared with a window's neighbors.
 %
@@ -22,32 +24,46 @@ slice_name = {'many-turns', 'medley-1', 'medley-2'};
 window_size = 20;
 window_overlap = 20;
 
-% An experimental feature that overweights very unlikely features.
-% Entries with this label will be duplicated N times according to that
-% factor. Entries without the label will not be duplicated
-weight_map = [
-    {'anticlockwise', 0}; ...
-    {'R-turn', 0}; ...
-    {'L-turn', 0}
-];
+% Configuration of the butterworth filter dividing static and
+% dynamic acceleration.
+static_filter_order = 3;
+static_filter_cutoff = 0.6;
 
 %% Load and preprocess data
 [accel, times, label_times, label_names] = ... 
     load_accel_slice_windowed(slice_name, window_size, window_overlap);
 
+%% Generate data to use in features
+[low_b, low_a] = butter(static_filter_order, static_filter_cutoff / sample_rate);
+static_accel = filter(low_b, low_a, accel, [], 1);
+dynamic_accel = accel - static_accel;
+
 %% Make and Process features
 means_x = feature_accel(accel, 1, 3);
 means_y = feature_accel(accel, 2, 3);
 means_z = feature_accel(accel, 3, 3);
-[pitch, roll] = feature_static_accel(accel, 25, 3, 0.6);
-tails = feature_tailbeat(accel, 1024, 25, 0.8, 1.6);
+odba = feature_odba(dynamic_accel);
+[pitch, roll] = feature_pitch_and_roll(accel, static_accel);
 
-features = table(means_x, means_y, means_z, ...
-    tails(:, 1), tails(:, 2), tails(:, 3), pitch, roll);
+[tail_distinct, tail_freq] = feature_tailbeat(accel, 1024, 25, 0.8, 1.6);
+
+features = table(...
+    means_x, means_y, means_z, ...
+    odba(:, 1), ...
+    odba(:, 2), ...
+    odba(:, 3), ...
+    tail_distinct(:, 1), ...
+    tail_distinct(:, 2), ...
+    tail_distinct(:, 3), ...
+    tail_freq(:, 1), ....
+    tail_freq(:, 2), ....
+    tail_freq(:, 3), ....
+    pitch, roll...
+);
 
 % Shuffle features/labels to randomize training set and test set
 rand_inds = randperm(height(features));
-r_features = features(rand_inds, :);
+r_features = features(rand_inds, :);tail_freq(:, 1), ...
 r_labels = label_names(rand_inds);
 
 %% Get Accuracy
@@ -64,13 +80,20 @@ assert(height(training_features) + height(test_features) == length(label_names))
 % Standardize variables - use Training Set's mean and std. dev.
 training_mean = mean(training_features{:,:});
 training_std = std(training_features{:,:});
+
 training_features{:,:} = (training_features{:,:} - training_mean) ./ training_std;
 test_features{:,:} = (test_features{:,:} - training_mean) ./ training_std;
 
+% Save features before we oversample them
+writetable([training_features, table(training_labels)], ...
+            "Features/training-standard.csv");
+writetable([test_features, table(test_labels, ...
+            'VariableNames', {'training_labels'})], ...
+            "Features/test-standard.csv");
 % Oversample less common classes in training set only
 dupe_features = table();
 dupe_labels = [];
-for wi = 1:length(weight_map)
+for wi = 1:length(weight_map)tail_freq(:, 1), ...
    label = weight_map(wi, 1);
    freq = weight_map{wi, 2} - 1;
    if freq > 0
@@ -99,7 +122,6 @@ training_accuracy = sum(training_labels == training_predictions) ...
 
 disp("Test accuracy: " + test_accuracy);
 disp("Training accuracy: " + training_accuracy);
-disp("Accuracy of a dice-throwing monkey: " + 1 / length(categories(label_names)));
 
 % Gory details
 fprintf("\nGORY DETAILS\n\n");
