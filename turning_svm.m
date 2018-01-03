@@ -29,9 +29,15 @@ window_overlap = 20;
 static_filter_order = 3;
 static_filter_cutoff = 0.6;
 
+% Thresholds for the ROC curve to check.
+% Should be a row vector.
+roc_thresholds = linspace(0, 1, 30);
+
 %% Load and preprocess data
 [accel, times, label_times, label_names] = ... 
     load_accel_slice_windowed(slice_name, window_size, window_overlap);
+
+label_categories = categories(label_names);
 
 %% Generate data to use in features
 [low_b, low_a] = butter(static_filter_order, static_filter_cutoff / sample_rate);
@@ -63,7 +69,7 @@ features = table(...
 
 % Shuffle features/labels to randomize training set and test set
 rand_inds = randperm(height(features));
-r_features = features(rand_inds, :);tail_freq(:, 1), ...
+r_features = features(rand_inds, :);
 r_labels = label_names(rand_inds);
 
 %% Get Accuracy
@@ -84,34 +90,74 @@ training_std = std(training_features{:,:});
 training_features{:,:} = (training_features{:,:} - training_mean) ./ training_std;
 test_features{:,:} = (test_features{:,:} - training_mean) ./ training_std;
 
-% Save features before we oversample them
+% Save features
 writetable([training_features, table(training_labels)], ...
             "Features/training-standard.csv");
 writetable([test_features, table(test_labels, ...
             'VariableNames', {'training_labels'})], ...
             "Features/test-standard.csv");
-% Oversample less common classes in training set only
-dupe_features = table();
-dupe_labels = [];
-for wi = 1:length(weight_map)tail_freq(:, 1), ...
-   label = weight_map(wi, 1);
-   freq = weight_map{wi, 2} - 1;
-   if freq > 0
-       inds = (training_labels == label);
-       dupe_features = [dupe_features ; repmat(training_features(inds,:), freq, 1)];
-       dupe_labels = [dupe_labels ; repmat(training_labels(inds), freq, 1)]; 
-   end
-end
-
-training_features = [features ; dupe_features];
-training_labels = [label_names ; dupe_labels];
 
 % Train and predict
 svm_template = templateSVM('KernelFunction', 'Gaussian');
 
-svm_trainer = fitcecoc(training_features, training_labels, 'Learners', svm_template);
-training_predictions = predict(svm_trainer, training_features);
-test_predictions = predict(svm_trainer, test_features);
+svm_trainer = fitcecoc(training_features, training_labels, 'FitPosterior', 1, 'Learners', svm_template);
+[training_predictions, ~, ~, training_probabilities] = ...
+    predict(svm_trainer, training_features);
+[test_predictions, ~, ~, test_probabilities] = ...
+    predict(svm_trainer, test_features);
+
+% ROC Curves
+% An ROC curve for a given class plots TP against FP for various 
+% thresholds between 0 and 1. A perfect ROC curve will go straight up
+% the Y axis and along the X axis; a perfectly awful ROC curve will
+% sit on the diagonal.
+% 
+% We can use this to select a model that maximizes TP and minimizes FP.
+% In our case, we want a high true positive rate for turning and a low
+% FP rate for straight swimming.
+% 
+% The classifier's general performance is its AUC - area under the curve.
+% The AUC of a coin-flipping monkey is 0.5, so if your AUC is under 0.5
+% it's possible that the classifier is finding a relationship that is
+% the opposite of what is expected.
+
+% M = number of test examples
+% C = number of classes
+% T = number of thresholds
+
+% full_thresh is (MxCxT)
+% roc_thresholds is (1xT)
+full_thresh = reshape(roc_thresholds, 1, 1, length(roc_thresholds));
+full_thresh = repmat(full_thresh, [size(test_probabilities), 1]);
+
+% full_probs is (MxCxT)
+% test_probabilities is (MxC)
+full_probs = repmat(test_probabilities, 1, 1, length(roc_thresholds));
+
+full_positives = (full_probs >= full_thresh);
+
+% Now we want to expand each test_label from a categorical array into a 
+% full array.
+test_positives = false(size(full_positives));
+for i = 1:length(label_categories)
+    col = (test_labels == label_categories{i});
+    test_positives(:,i,:) = repmat(col, 1, 1, length(roc_thresholds));
+end
+
+true_positives = sum(full_positives & test_positives);
+true_positives = reshape(true_positives, length(label_categories), ...
+    length(roc_thresholds))';
+true_positives = true_positives ./ max(true_positives);
+
+false_positives = sum(full_positives & ~test_positives);
+false_positives = reshape(false_positives, length(label_categories), ...
+    length(roc_thresholds))';
+false_positives = false_positives ./ max(false_positives);
+
+plot(true_positives, false_positives);
+legend(label_categories);
+xlabel("True Positive Ratio");
+ylabel("False Positive Ratio");
 
 % Accuracy
 fprintf("\nACCURACY\n\n");
@@ -125,12 +171,11 @@ disp("Training accuracy: " + training_accuracy);
 
 % Gory details
 fprintf("\nGORY DETAILS\n\n");
-cats = categories(label_names);
-precisions = zeros(size(cats));
-recalls = zeros(size(cats));
+precisions = zeros(size(label_categories));
+recalls = zeros(size(label_categories));
 
-for i=1:length(cats)
-    cat = string(cats{i});
+for i=1:length(label_categories)
+    cat = string(label_categories{i});
     actual   = (cat == test_predictions);
     expected = (cat == test_labels);
     
@@ -146,6 +191,6 @@ for i=1:length(cats)
     recalls(i)    = true_positives / (true_positives + false_negatives);
 end
 
-results = table(cats, precisions, recalls);
+results = table(label_categories, precisions, recalls);
 results.Properties.VariableNames = {'Classes', 'Precision', 'Recall'};
 disp(results);
