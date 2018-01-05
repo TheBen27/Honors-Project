@@ -18,9 +18,11 @@ mean_x = mean(mean(accel(:,1,:), 3), 1);
 all_pitches = asin(low_x - mean_x) * (180 / pi); % [M x 1 x N]
 all_rolls = atan2(-low_z, low_y);
 
+% Beginning to think this whole "windowed" thing has led to entirely too
+% much permuting and cache thrashing
 num_windows = size(accel, 3);
-pitch = reshape(mean(all_pitches, 1), num_windows, 1, 1);
-roll = reshape(mean(all_rolls, 1), num_windows, 1, 1);
+pitch = permute(mean(all_pitches, 1), [3, 1, 2]);
+roll = permute(mean(all_rolls, 1), [3, 1, 2]);
 
 end
 

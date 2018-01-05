@@ -21,6 +21,4 @@ for w=1:windows
     means(w) = mean(window(1:maxes));
 end
 
-%means = mean(accel_ws, 1);
-%means = reshape(means, windows, 1, 1);
 end

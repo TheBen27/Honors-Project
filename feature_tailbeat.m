@@ -27,10 +27,8 @@ frequency = freqs(tail_ind);
 energy = mean(accel_pow, 1);
 distinctiveness = tail_amp ./ energy;
 
-num_windows = size(distinctiveness, 3);
-num_axes = size(distinctiveness, 2);
-distinctiveness = reshape(distinctiveness, num_windows, num_axes, 1);
-frequency = reshape(frequency, num_windows, num_axes, 1);
+distinctiveness = permute(distinctiveness, [3, 2, 1]);
+frequency = permute(frequency, [3, 2, 1]);
 
 end
 

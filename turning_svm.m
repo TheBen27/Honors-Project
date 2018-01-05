@@ -55,9 +55,7 @@ odba = feature_odba(dynamic_accel);
 
 features = table(...
     means_x, means_y, means_z, ...
-    odba(:, 1), ...
-    odba(:, 2), ...
-    odba(:, 3), ...
+    odba,...
     tail_distinct(:, 1), ...
     tail_distinct(:, 2), ...
     tail_distinct(:, 3), ...
@@ -66,6 +64,13 @@ features = table(...
     tail_freq(:, 3), ....
     pitch, roll...
 );
+features.Properties.VariableNames = {...
+    'means_x', 'means_y', 'means_z', ...
+    'odba', ...
+    'distinctiveness_x', 'distinctiveness_y', 'distinctiveness_z', ...
+    'frequency_x', 'frequency_y', 'frequency_z', ...
+    'pitch', 'roll'
+};
 
 % Shuffle features/labels to randomize training set and test set
 rand_inds = randperm(height(features));
@@ -90,6 +95,13 @@ training_std = std(training_features{:,:});
 training_features{:,:} = (training_features{:,:} - training_mean) ./ training_std;
 test_features{:,:} = (test_features{:,:} - training_mean) ./ training_std;
 
+% If the standard deviation of any column is 0, we get zerodiv errors
+if any(training_std == 0)
+    warning("One of your features has a standard deviation of 0. Standardizing to 0...");
+    training_features{:, training_std == 0} = 0;
+    test_features{:, training_std == 0} = 0;
+end
+
 % Save features
 writetable([training_features, table(training_labels)], ...
             "Features/training-standard.csv");
@@ -107,10 +119,13 @@ svm_trainer = fitcecoc(training_features, training_labels, 'FitPosterior', 1, 'L
     predict(svm_trainer, test_features);
 
 % ROC Curves
-% An ROC curve for a given class plots TP against FP for various 
+% An ROC curve for a given class plots TP rate against FP rate for various
 % thresholds between 0 and 1. A perfect ROC curve will go straight up
 % the Y axis and along the X axis; a perfectly awful ROC curve will
 % sit on the diagonal.
+%
+% In this case, TP rate is TP / (TP + FN)
+% FP rate is FP / (FP + TN)
 % 
 % We can use this to select a model that maximizes TP and minimizes FP.
 % In our case, we want a high true positive rate for turning and a low
@@ -127,13 +142,12 @@ svm_trainer = fitcecoc(training_features, training_labels, 'FitPosterior', 1, 'L
 
 % full_thresh is (MxCxT)
 % roc_thresholds is (1xT)
-full_thresh = reshape(roc_thresholds, 1, 1, length(roc_thresholds));
+full_thresh = permute(roc_thresholds, [1, 3, 2]);
 full_thresh = repmat(full_thresh, [size(test_probabilities), 1]);
 
 % full_probs is (MxCxT)
 % test_probabilities is (MxC)
 full_probs = repmat(test_probabilities, 1, 1, length(roc_thresholds));
-
 full_positives = (full_probs >= full_thresh);
 
 % Now we want to expand each test_label from a categorical array into a 
@@ -144,17 +158,19 @@ for i = 1:length(label_categories)
     test_positives(:,i,:) = repmat(col, 1, 1, length(roc_thresholds));
 end
 
-true_positives = sum(full_positives & test_positives);
-true_positives = reshape(true_positives, length(label_categories), ...
-    length(roc_thresholds))';
-true_positives = true_positives ./ max(true_positives);
 
-false_positives = sum(full_positives & ~test_positives);
-false_positives = reshape(false_positives, length(label_categories), ...
-    length(roc_thresholds))';
-false_positives = false_positives ./ max(false_positives);
+full_positives = permute(full_positives, [3, 2, 1]);
+test_positives = permute(test_positives, [3, 2, 1]);
 
-plot(true_positives, false_positives);
+true_positives = sum(full_positives & test_positives, 3);
+false_positives = sum(full_positives & ~test_positives, 3);
+true_negatives = sum(~full_positives & ~test_positives, 3);
+false_negatives = sum(~full_positives & test_positives, 3);
+
+true_positive_rate = true_positives ./ (true_positives + false_negatives);
+false_positive_rate = false_positives ./ (false_positives + true_negatives);
+
+plot(true_positive_rate, false_positive_rate);
 legend(label_categories);
 xlabel("True Positive Ratio");
 ylabel("False Positive Ratio");
