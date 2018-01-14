@@ -39,6 +39,17 @@ roc_thresholds = linspace(0, 1, 30);
 
 label_categories = categories(label_names);
 
+% Give a summary of the base probabilities of each label
+disp("");
+disp("BASE FREQUENCIES");
+for cat_i = 1:length(label_categories)
+    cat = label_categories{cat_i};
+    cat_pos = sum(label_names == cat);
+    cat_perc = cat_pos / length(label_names);
+    disp(cat + ": " + cat_pos + "/" + length(label_names) + ...
+        " (" + cat_perc * 100 + "%)");
+end
+
 %% Generate data to use in features
 [low_b, low_a] = butter(static_filter_order, static_filter_cutoff / sample_rate);
 static_accel = filter(low_b, low_a, accel, [], 1);
@@ -51,7 +62,7 @@ means_z = feature_accel(accel, 3, 3);
 odba = feature_odba(dynamic_accel);
 [pitch, roll] = feature_pitch_and_roll(accel, static_accel);
 
-[tail_distinct, tail_freq] = feature_tailbeat(accel, 1024, 25, 0.8, 1.6);
+[tail_distinct, tail_freq] = feature_tailbeat(accel, 25, 0.8, 1.6);
 
 features = table(...
     means_x, means_y, means_z, ...

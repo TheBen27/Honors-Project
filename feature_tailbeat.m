@@ -1,5 +1,5 @@
 function [ distinctiveness, frequency ] = feature_tailbeat( ...
-    accel, nfft, sample_rate, high_pass, low_pass)
+    accel, sample_rate, high_pass, low_pass)
 %FEATURE_TAILBEAT Try to estimate the tailbeat frequency of a window of data.
 %
 % accel is organized in windows (m entries/window x 3 columns x n windows).
@@ -11,6 +11,7 @@ function [ distinctiveness, frequency ] = feature_tailbeat( ...
 % (e.g. it might just be noise).
 
 % Get PSD and filter frequencies via brickwall
+nfft = length(accel);
 accel_fft = fftshift(fft(accel,  nfft, 1), 1);
 accel_pow = accel_fft .* conj(accel_fft) / (nfft * size(accel, 1));
 
