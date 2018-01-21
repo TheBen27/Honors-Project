@@ -33,6 +33,15 @@ static_filter_cutoff = 0.6;
 % Should be a row vector.
 roc_thresholds = linspace(0, 1, 30);
 
+% Number of bootstrap classifiers to create
+% Each classifier is made from a sample taken with replacement from the
+% original training set, with majority classes undersampled until they
+% match minority classes.
+bootstrap_samples = 8;
+bootstrap_sample_size_ratio = 1.0;
+
+undersample_straight_swimming = true;
+
 %% Load and preprocess data
 [accel, times, label_times, label_names] = ... 
     load_accel_slice_windowed(slice_name, window_size, window_overlap);
@@ -55,7 +64,7 @@ end
 static_accel = filter(low_b, low_a, accel, [], 1);
 dynamic_accel = accel - static_accel;
 
-%% Make and Process features
+%% Make feature table
 means_x = feature_accel(accel, 1, 3);
 means_y = feature_accel(accel, 2, 3);
 means_z = feature_accel(accel, 3, 3);
@@ -83,12 +92,12 @@ features.Properties.VariableNames = {...
     'pitch', 'roll'
 };
 
+%% Split and Preprocess Data
+
 % Shuffle features/labels to randomize training set and test set
 rand_inds = randperm(height(features));
 r_features = features(rand_inds, :);
 r_labels = label_names(rand_inds);
-
-%% Get Accuracy
 
 % Split into training set and test set
 training_size = floor(length(label_names) * 0.8);
@@ -120,16 +129,19 @@ writetable([test_features, table(test_labels, ...
             'VariableNames', {'training_labels'})], ...
             "Features/test-standard.csv");
 
+%% Generate bootstrap classifiers
+
 % Train and predict
 svm_template = templateSVM('KernelFunction', 'Gaussian');
 
-svm_trainer = fitcecoc(training_features, training_labels, 'FitPosterior', 1, 'Learners', svm_template);
+svm_trainer = fitcecoc(training_features, training_labels,...
+    'FitPosterior', 1, 'Learners', svm_template);
 [training_predictions, ~, ~, training_probabilities] = ...
     predict(svm_trainer, training_features);
 [test_predictions, ~, ~, test_probabilities] = ...
     predict(svm_trainer, test_features);
 
-% ROC Curves
+%% Plot ROC Curves
 % An ROC curve for a given class plots TP rate against FP rate for various
 % thresholds between 0 and 1. A perfect ROC curve will go straight up
 % the Y axis and along the X axis; a perfectly awful ROC curve will
@@ -156,8 +168,6 @@ svm_trainer = fitcecoc(training_features, training_labels, 'FitPosterior', 1, 'L
 full_thresh = permute(roc_thresholds, [1, 3, 2]);
 full_thresh = repmat(full_thresh, [size(test_probabilities), 1]);
 
-% full_probs is (MxCxT)
-% test_probabilities is (MxC)
 full_probs = repmat(test_probabilities, 1, 1, length(roc_thresholds));
 full_positives = (full_probs >= full_thresh);
 
@@ -168,7 +178,6 @@ for i = 1:length(label_categories)
     col = (test_labels == label_categories{i});
     test_positives(:,i,:) = repmat(col, 1, 1, length(roc_thresholds));
 end
-
 
 full_positives = permute(full_positives, [3, 2, 1]);
 test_positives = permute(test_positives, [3, 2, 1]);
@@ -186,7 +195,7 @@ legend(label_categories);
 xlabel("True Positive Ratio");
 ylabel("False Positive Ratio");
 
-% Accuracy
+%% Plot accuracy and confusion matrix
 fprintf("\nACCURACY\n\n");
 test_accuracy = sum(test_labels == test_predictions) ...
     / length(test_predictions);
