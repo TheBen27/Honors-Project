@@ -8,7 +8,7 @@ function [new_features, new_labels] = make_bootstrap_sample(...
 n_samples = floor(height(features) * ratio);
 new_inds = 1 + floor(rand(n_samples, 1) * height(features));
 new_features = features(new_inds, :);
-new_labels = labels(new_inds)';
+new_labels = labels(new_inds);
 
 if ~isempty(majority_classes)
     % Undersample majority class.

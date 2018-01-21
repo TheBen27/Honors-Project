@@ -38,7 +38,8 @@ roc_thresholds = linspace(0, 1, 30);
 % original training set, with majority classes undersampled until they
 % match minority classes.
 bootstrap_samples = 8;
-bootstrap_sample_size_ratio = 1.0;
+bootstrap_ratio = 5.0;
+bootstrap_classes = categorical({'clockwise', 'anticlockwise'})';
 
 undersample_straight_swimming = true;
 
@@ -129,17 +130,31 @@ writetable([test_features, table(test_labels, ...
             'VariableNames', {'training_labels'})], ...
             "Features/test-standard.csv");
 
-%% Generate bootstrap classifiers
+% Create bootstrap samples for classifiers
+% Matlab does not support 3D tables, so we will use cell arrays instead
+bootstrap_features = cell(bootstrap_samples, 1);
+bootstrap_labels = cell(bootstrap_samples, 1);
+for i=1:bootstrap_samples
+   [bfs, bls] = ...
+        make_bootstrap_sample(training_features, training_labels, ...
+        bootstrap_ratio, bootstrap_classes);
+   bootstrap_features{i} = bfs;
+   bootstrap_labels{i} = bls;
+end
+
+%% Generate classifier
 
 % Train and predict
 svm_template = templateSVM('KernelFunction', 'Gaussian');
 
-svm_trainer = fitcecoc(training_features, training_labels,...
-    'FitPosterior', 1, 'Learners', svm_template);
-[training_predictions, ~, ~, training_probabilities] = ...
-    predict(svm_trainer, training_features);
-[test_predictions, ~, ~, test_probabilities] = ...
-    predict(svm_trainer, test_features);
+bootstrap_probabilities = zeros(height(test_features), ...
+    length(label_categories), bootstrap_samples);
+for i=1:bootstrap_samples
+   disp("Fitting bootstrap " + i + "...");
+   trainer = fitcecoc(bootstrap_features{i}, bootstrap_labels{i}, ...
+       'FitPosterior', 1, 'Learners', svm_template);
+   [~, ~, ~, bootstrap_probabilities(:,:,i)] = predict(trainer, test_features);
+end
 
 %% Plot ROC Curves
 % An ROC curve for a given class plots TP rate against FP rate for various
@@ -166,11 +181,18 @@ svm_trainer = fitcecoc(training_features, training_labels,...
 % full_thresh is (MxCxT)
 % roc_thresholds is (1xT)
 full_thresh = permute(roc_thresholds, [1, 3, 2]);
-full_thresh = repmat(full_thresh, [size(test_probabilities), 1]);
+full_thresh = repmat(full_thresh, [size(bootstrap_probabilities(:,:,1)), 1]);
 
-full_probs = repmat(test_probabilities, 1, 1, length(roc_thresholds));
-full_positives = (full_probs >= full_thresh);
-
+% Generate predictions for each threshold by majority vote with bootstrap
+% samples. The final array is (MxCxT), matching full_thresh
+full_positives = zeros(size(full_thresh));
+for i=1:bootstrap_samples
+    probs = bootstrap_probabilities(:,:,i);
+    full_probs = repmat(probs, 1, 1, length(roc_thresholds));
+    full_positives = full_positives + (full_probs >= full_thresh);
+end
+full_positives = (full_positives > (bootstrap_samples / 2));
+ 
 % Now we want to expand each test_label from a categorical array into a 
 % full array.
 test_positives = false(size(full_positives));
@@ -196,37 +218,37 @@ xlabel("True Positive Ratio");
 ylabel("False Positive Ratio");
 
 %% Plot accuracy and confusion matrix
-fprintf("\nACCURACY\n\n");
-test_accuracy = sum(test_labels == test_predictions) ...
-    / length(test_predictions);
-training_accuracy = sum(training_labels == training_predictions) ...
-    / length(training_predictions);
-
-disp("Test accuracy: " + test_accuracy);
-disp("Training accuracy: " + training_accuracy);
-
-% Gory details
-fprintf("\nGORY DETAILS\n\n");
-precisions = zeros(size(label_categories));
-recalls = zeros(size(label_categories));
-
-for i=1:length(label_categories)
-    cat = string(label_categories{i});
-    actual   = (cat == test_predictions);
-    expected = (cat == test_labels);
-    
-    true_positives  = sum(actual & expected);
-    false_positives = sum(actual & ~expected);
-    false_negatives = sum(expected & ~actual);
-    
-    % Precision is a measure of quality - if the machine thought it
-    % was this class, was it right?
-    precisions(i) = true_positives / (true_positives + false_positives);
-    % Recall is a measurement of quantity - if an example was of this
-    % class, did the machine pick it?
-    recalls(i)    = true_positives / (true_positives + false_negatives);
-end
-
-results = table(label_categories, precisions, recalls);
-results.Properties.VariableNames = {'Classes', 'Precision', 'Recall'};
-disp(results);
+% fprintf("\nACCURACY\n\n");
+% test_accuracy = sum(test_labels == test_predictions) ...
+%     / length(test_predictions);
+% training_accuracy = sum(training_labels == training_predictions) ...
+%     / length(training_predictions);
+% 
+% disp("Test accuracy: " + test_accuracy);
+% disp("Training accuracy: " + training_accuracy);
+% 
+% % Gory details
+% fprintf("\nGORY DETAILS\n\n");
+% precisions = zeros(size(label_categories));
+% recalls = zeros(size(label_categories));
+% 
+% for i=1:length(label_categories)
+%     cat = string(label_categories{i});
+%     actual   = (cat == test_predictions);
+%     expected = (cat == test_labels);
+%     
+%     true_positives  = sum(actual & expected);
+%     false_positives = sum(actual & ~expected);
+%     false_negatives = sum(expected & ~actual);
+%     
+%     % Precision is a measure of quality - if the machine thought it
+%     % was this class, was it right?
+%     precisions(i) = true_positives / (true_positives + false_positives);
+%     % Recall is a measurement of quantity - if an example was of this
+%     % class, did the machine pick it?
+%     recalls(i)    = true_positives / (true_positives + false_negatives);
+% end
+% 
+% results = table(label_categories, precisions, recalls);
+% results.Properties.VariableNames = {'Classes', 'Precision', 'Recall'};
+% disp(results);

@@ -1,8 +1,8 @@
 feats = table((1:4)');
-labels = categorical({'a', 'b', 'c', 'd'});
+labels = categorical({'a', 'b', 'c', 'd'})';
 
 [~, no_undersample] = make_bootstrap_sample(feats, labels, 2000.0, []);
-[~, undersample] = make_bootstrap_sample(feats, labels, 2000.0, categorical({'a','b','c'}));
+[~, undersample] = make_bootstrap_sample(feats, labels, 2000.0, categorical({'a','b','c'})');
 
 no_under_as = sum(no_undersample == 'a') / length(no_undersample);
 under_as = sum(undersample == 'a') / length(undersample);
