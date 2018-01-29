@@ -31,14 +31,14 @@ static_filter_cutoff = 0.6;
 
 % Thresholds for the ROC curve to check.
 % Should be a row vector.
-roc_thresholds = linspace(0, 1, 30);
+roc_thresholds = linspace(0, 1, 300);
 
 % Number of bootstrap classifiers to create
 % Each classifier is made from a sample taken with replacement from the
 % original training set, with majority classes undersampled until they
 % match minority classes.
-bootstrap_samples = 8;
-bootstrap_ratio = 5.0;
+bootstrap_samples = 4;
+bootstrap_ratio = 3.0;
 bootstrap_classes = categorical({'clockwise', 'anticlockwise'})';
 
 undersample_straight_swimming = true;
@@ -66,16 +66,16 @@ static_accel = filter(low_b, low_a, accel, [], 1);
 dynamic_accel = accel - static_accel;
 
 %% Make feature table
-means_x = feature_accel(accel, 1, 3);
-means_y = feature_accel(accel, 2, 3);
-means_z = feature_accel(accel, 3, 3);
+means = feature_means_extreme(accel);
 odba = feature_odba(dynamic_accel);
 [pitch, roll] = feature_pitch_and_roll(accel, static_accel);
 
 [tail_distinct, tail_freq] = feature_tailbeat(accel, 25, 0.8, 1.6);
 
 features = table(...
-    means_x, means_y, means_z, ...
+    means(:,1), ...
+    means(:,2), ...
+    means(:,3), ...
     odba,...
     tail_distinct(:, 1), ...
     tail_distinct(:, 2), ...
@@ -94,7 +94,6 @@ features.Properties.VariableNames = {...
 };
 
 %% Split and Preprocess Data
-
 % Shuffle features/labels to randomize training set and test set
 rand_inds = randperm(height(features));
 r_features = features(rand_inds, :);
@@ -156,6 +155,7 @@ for i=1:bootstrap_samples
    [~, ~, ~, bootstrap_probabilities(:,:,i)] = predict(trainer, test_features);
 end
 
+
 %% Plot ROC Curves
 % An ROC curve for a given class plots TP rate against FP rate for various
 % thresholds between 0 and 1. A perfect ROC curve will go straight up
@@ -209,13 +209,42 @@ false_positives = sum(full_positives & ~test_positives, 3);
 true_negatives = sum(~full_positives & ~test_positives, 3);
 false_negatives = sum(~full_positives & test_positives, 3);
 
+% TP Rate = recall
+% Probability that the class is correctly detected out of the total number
+% of positives detected
 true_positive_rate = true_positives ./ (true_positives + false_negatives);
+% FP Rate = fall-out, "probability of false alarm"
+% Probability of a class incorrectly detected out of the total number of
+% negatives detected
 false_positive_rate = false_positives ./ (false_positives + true_negatives);
 
-plot(true_positive_rate, false_positive_rate);
-legend(label_categories);
-xlabel("True Positive Ratio");
-ylabel("False Positive Ratio");
+hold on
+stairs(false_positive_rate, true_positive_rate);
+plot([0,1], [0,1],'--');
+legend(label_categories, 'Location', 'southeast');
+xlabel("False Positive Rate");
+ylabel("True Positive Rate");
+hold off
+
+%% Area Under Curve Calculations
+% The area under the ROC curve represents "discrimination" - the chance
+% that, given one random positive sample and random one negative sample,
+% the positive sample will be higher rated than the negative one.
+%
+% As threshold increases, FP and TP rate both decrease, though at different
+% rates. The area of a single bar between two thresholds is:
+%
+% (TP rate of current threshold) * (FP rate of current threshold - FP rate of next threshold)
+next_fp = false_positive_rate(2:length(false_positive_rate), :);
+next_fp(length(next_fp)+1, :) = 1;
+
+auc = sum(true_positive_rate .* (false_positive_rate - next_fp));
+disp("AUROCs");
+disp("======");
+for i=1:length(label_categories)
+   cat = label_categories{i};
+   disp(cat + ": " + auc(i));
+end
 
 %% Plot accuracy and confusion matrix
 % fprintf("\nACCURACY\n\n");
