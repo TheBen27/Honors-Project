@@ -31,13 +31,13 @@ static_filter_cutoff = 0.6;
 
 % Thresholds for the ROC curve to check.
 % Should be a row vector.
-roc_thresholds = linspace(0, 1, 300);
+roc_thresholds = linspace(0, 1, 1500);
 
 % Number of bootstrap classifiers to create
 % Each classifier is made from a sample taken with replacement from the
 % original training set, with majority classes undersampled until they
 % match minority classes.
-bootstrap_samples = 4;
+bootstrap_samples = 7;
 bootstrap_ratio = 3.0;
 bootstrap_classes = categorical({'clockwise', 'anticlockwise'})';
 
@@ -148,13 +148,52 @@ svm_template = templateSVM('KernelFunction', 'Gaussian');
 
 bootstrap_probabilities = zeros(height(test_features), ...
     length(label_categories), bootstrap_samples);
+bootstrap_predictions = repmat(test_labels(1), height(test_features), bootstrap_samples);
 for i=1:bootstrap_samples
    disp("Fitting bootstrap " + i + "...");
    trainer = fitcecoc(bootstrap_features{i}, bootstrap_labels{i}, ...
        'FitPosterior', 1, 'Learners', svm_template);
-   [~, ~, ~, bootstrap_probabilities(:,:,i)] = predict(trainer, test_features);
+   [bootstrap_predictions(:,i), ~, ~, ...
+       bootstrap_probabilities(:,:,i)] = predict(trainer, test_features);
 end
 
+%% Get general confusion matrix
+% Use majority vote to make predictions
+prediction_counts = zeros(length(bootstrap_predictions), length(label_categories));
+for i=1:length(label_categories)
+    prediction_counts(:,i) = sum(bootstrap_predictions == label_categories{i}, 2);
+end
+[~, predictions] = max(prediction_counts, [], 2);
+predictions = categorical(label_categories(predictions));
+
+% Find information about a class
+true_pos_preds  = zeros(4, 1);
+false_pos_preds = zeros(4, 1);
+true_neg_preds  = zeros(4, 1);
+false_neg_preds = zeros(4, 1);
+for i=1:length(label_categories)
+    cat = label_categories{i};
+    disp(cat);
+    disp("=======");
+    true_pos_preds(i)  = sum(predictions == cat & test_labels == cat);
+    false_pos_preds(i) = sum(predictions == cat & test_labels ~= cat);
+    true_neg_preds(i)  = sum(predictions ~= cat & test_labels ~= cat);
+    false_neg_preds(i) = sum(predictions ~= cat & test_labels == cat);
+    
+    total = length(test_labels);
+    confusion_matrix = table(...
+        [true_neg_preds(i); false_neg_preds(i)], ...
+        [false_pos_preds(i); true_pos_preds(i)], ...
+        'VariableNames', {'Not_Predicted', 'Predicted'}, ...
+        'RowNames', {'Not_Actual', 'Actual'});
+    disp(confusion_matrix);
+    
+    precision = true_pos_preds(i) / (true_pos_preds(i) + false_pos_preds(i));
+    recall = true_pos_preds(i) / (true_pos_preds(i) + false_neg_preds(i));
+    disp("Precision: " + precision);
+    disp("Recall: " + recall);
+    disp("");
+end
 
 %% Plot ROC Curves
 % An ROC curve for a given class plots TP rate against FP rate for various
@@ -219,7 +258,7 @@ true_positive_rate = true_positives ./ (true_positives + false_negatives);
 false_positive_rate = false_positives ./ (false_positives + true_negatives);
 
 hold on
-stairs(false_positive_rate, true_positive_rate);
+stairs(false_positive_rate, true_positive_rate, "-*");
 plot([0,1], [0,1],'--');
 legend(label_categories, 'Location', 'southeast');
 xlabel("False Positive Rate");
