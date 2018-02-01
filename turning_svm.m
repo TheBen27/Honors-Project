@@ -33,13 +33,17 @@ static_filter_cutoff = 0.6;
 % Should be a row vector.
 roc_thresholds = linspace(0, 1, 1500);
 
+% Percent of data that goes to the training set; the rest goes to
+% the test set.
+training_set_portion = 0.7;
+
 % Number of bootstrap classifiers to create
 % Each classifier is made from a sample taken with replacement from the
 % original training set, with majority classes undersampled until they
 % match minority classes.
 bootstrap_samples = 7;
-bootstrap_ratio = 3.0;
-bootstrap_classes = categorical({'clockwise', 'anticlockwise'})';
+bootstrap_ratio = 10.0;
+bootstrap_classes = {'clockwise', 'anticlockwise'};
 
 undersample_straight_swimming = true;
 
@@ -66,6 +70,8 @@ static_accel = filter(low_b, low_a, accel, [], 1);
 dynamic_accel = accel - static_accel;
 
 %% Make feature table
+disp("Generating features...");
+
 means = feature_means_extreme(accel);
 odba = feature_odba(dynamic_accel);
 [pitch, roll] = feature_pitch_and_roll(accel, static_accel);
@@ -94,13 +100,14 @@ features.Properties.VariableNames = {...
 };
 
 %% Split and Preprocess Data
+disp("Generating sample sets...");
 % Shuffle features/labels to randomize training set and test set
 rand_inds = randperm(height(features));
 r_features = features(rand_inds, :);
 r_labels = label_names(rand_inds);
 
 % Split into training set and test set
-training_size = floor(length(label_names) * 0.8);
+training_size = floor(length(label_names) * training_set_portion);
 training_features = r_features(1:training_size, :);
 training_labels   = r_labels(1:training_size, :);
 test_features = r_features((1 + training_size):length(label_names), :);
@@ -141,7 +148,14 @@ for i=1:bootstrap_samples
    bootstrap_labels{i} = bls;
 end
 
+disp("Bootstrap sample amounts:");
+for ci=1:length(label_categories)
+    cat = label_categories{ci};
+    disp(cat + ": " + sum(bootstrap_labels{1} == cat));
+end
+
 %% Generate classifier
+disp("Training classifiers...");
 
 % Train and predict
 svm_template = templateSVM('KernelFunction', 'Gaussian');
@@ -284,39 +298,3 @@ for i=1:length(label_categories)
    cat = label_categories{i};
    disp(cat + ": " + auc(i));
 end
-
-%% Plot accuracy and confusion matrix
-% fprintf("\nACCURACY\n\n");
-% test_accuracy = sum(test_labels == test_predictions) ...
-%     / length(test_predictions);
-% training_accuracy = sum(training_labels == training_predictions) ...
-%     / length(training_predictions);
-% 
-% disp("Test accuracy: " + test_accuracy);
-% disp("Training accuracy: " + training_accuracy);
-% 
-% % Gory details
-% fprintf("\nGORY DETAILS\n\n");
-% precisions = zeros(size(label_categories));
-% recalls = zeros(size(label_categories));
-% 
-% for i=1:length(label_categories)
-%     cat = string(label_categories{i});
-%     actual   = (cat == test_predictions);
-%     expected = (cat == test_labels);
-%     
-%     true_positives  = sum(actual & expected);
-%     false_positives = sum(actual & ~expected);
-%     false_negatives = sum(expected & ~actual);
-%     
-%     % Precision is a measure of quality - if the machine thought it
-%     % was this class, was it right?
-%     precisions(i) = true_positives / (true_positives + false_positives);
-%     % Recall is a measurement of quantity - if an example was of this
-%     % class, did the machine pick it?
-%     recalls(i)    = true_positives / (true_positives + false_negatives);
-% end
-% 
-% results = table(label_categories, precisions, recalls);
-% results.Properties.VariableNames = {'Classes', 'Precision', 'Recall'};
-% disp(results);
