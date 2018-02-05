@@ -4,7 +4,7 @@ function [accel, times, start_time] = import_data(filename, add_start_time)
   % ;Start_time, 2017-06-15, 09:00:06.461
   fid = fopen(filename);
   if fid == -1
-      printf(['Error: could not read ' filename '\n']);
+      disp(strcat('Error: could not read ', filename, '\n'));
   end
   fgetl(fid);
   fgetl(fid);

@@ -12,7 +12,7 @@
 rng(3);
 
 % Cell array of data slices to use. These should all be labeled.
-slice_name = {'many-turns', 'medley-1', 'medley-2'};
+slice_name = {'many-turns', 'medley-1', 'medley-2', 'large-slice', 'small-slice'};
 
 sample_rate = 20;
 
@@ -21,8 +21,8 @@ sample_rate = 20;
 %
 % Data at the end of the set that does not fit squarely within a window is
 % cut off.
-window_size = 20;
-window_overlap = 20;
+window_size = 10;
+window_overlap = 10;
 
 % Configuration of the butterworth filter dividing static and
 % dynamic acceleration.
@@ -76,7 +76,7 @@ means = feature_means_extreme(accel);
 odba = feature_odba(dynamic_accel);
 [pitch, roll] = feature_pitch_and_roll(accel, static_accel);
 
-[tail_distinct, tail_freq] = feature_tailbeat(accel, 25, 0.8, 1.6);
+[tail_distinct, tail_freq] = feature_tailbeat(accel, sample_rate, 0.8, 1.6);
 
 features = table(...
     means(:,1), ...
