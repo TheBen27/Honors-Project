@@ -54,12 +54,6 @@ for win=1:num_windows
     end
     label_times(win) = label_times_r(most_prevalent_ind);
     label_names(win) = label_names_r(most_prevalent_ind);
-    
-%     % For now, just get the closest label
-%     closest_time = times_r(sind);
-%     closest_ind = find(label_times_r < closest_time, 1, 'last');
-%     label_times(win) = label_times_r(closest_ind);
-%     label_names(win) = label_names_r(closest_ind);
 end
 
 end

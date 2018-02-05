@@ -11,15 +11,16 @@ function [ distinctiveness, frequency ] = feature_tailbeat( ...
 % (e.g. it might just be noise).
 
 % Get PSD and filter frequencies via brickwall
-nfft = length(accel);
-accel_fft = fftshift(fft(accel,  nfft, 1), 1);
-accel_pow = accel_fft .* conj(accel_fft) / (nfft * size(accel, 1));
-
+nfft = 30 * size(accel, 1);
 freqs = sample_rate * (-nfft/2:nfft/2-1)/nfft;
 freqs_off_range = (freqs < high_pass) | (freqs > low_pass);
 
-accel_pow(freqs_off_range, :, :) = [];
+accel_fft = fftshift(fft(accel,  nfft, 1), 1);
+accel_fft(freqs_off_range, :, :) = [];
 freqs(freqs_off_range) = [];
+
+accel_pow = accel_fft .* conj(accel_fft) / (nfft * size(accel, 1));
+
 [tail_amp, tail_ind] = max(accel_pow, [], 1); % each are 1xCxW
 
 frequency = freqs(tail_ind);
