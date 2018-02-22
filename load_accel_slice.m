@@ -10,6 +10,10 @@ if ~iscell(slice_names)
    slice_names = {slice_names}; 
 end
 
+% average turn duration:
+%   - mean = 2.1s
+%   - std  = 0.8s
+
 accel_out = [];
 times_out = [];
 label_times = [];

@@ -4,11 +4,11 @@
 %% Configuration
 
 % Name of the slice from SLICES.MAT
-slice_name = 'medley-1';
+slice_name = 'single-left-turn';
 
 % Turning these off might result in faster processing.
 plot_raw_accel = true;
-plot_psds = false;
+plot_psds = true;
 plot_spectrograms = false; % Won't work on smaller segments
 
 if (~(plot_raw_accel || plot_psds || plot_spectrograms))
