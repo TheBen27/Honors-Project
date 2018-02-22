@@ -1,11 +1,6 @@
 %% Simple SVM for Turning Detection
 % A binary SVM for detecting turning.
-%
-% The data will be split into overlapping windows. The windows will
-% then be sent through a series of functions to act as feature
-% detectors, and the result put into a binary SVM. We'll then find
-% the accuracy of the features we've put in and, well, hopefully they'll
-% be better than that of a dice-throwing monkey.
+% ... Well, it used to be simple, anyway.
 %% Configuration
 
 % Save the seed so we get consistent results
@@ -21,8 +16,8 @@ sample_rate = 20;
 %
 % Data at the end of the set that does not fit squarely within a window is
 % cut off.
-window_size = 10;
-window_overlap = 10;
+window_size = 26;
+window_overlap = 12;
 
 % Configuration of the butterworth filter dividing static and
 % dynamic acceleration.
@@ -41,11 +36,16 @@ training_set_portion = 0.7;
 % Each classifier is made from a sample taken with replacement from the
 % original training set, with majority classes undersampled until they
 % match minority classes.
+enable_bootstrap = false;
 bootstrap_samples = 7;
-bootstrap_ratio = 10.0;
-bootstrap_classes = {'clockwise', 'anticlockwise'};
+bootstrap_ratio = 1.0;
+bootstrap_classes = categorical({'clockwise', 'anticlockwise'})';
 
 undersample_straight_swimming = true;
+
+if ~enable_bootstrap
+   bootstrap_samples = 1; 
+end
 
 %% Load and preprocess data
 [accel, times, label_times, label_names] = ... 
@@ -71,7 +71,7 @@ dynamic_accel = accel - static_accel;
 
 %% Make feature table
 disp("Generating features...");
-
+basic_stats = feature_basic_stats(accel);
 means = feature_means_extreme(accel);
 odba = feature_odba(dynamic_accel);
 [pitch, roll] = feature_pitch_and_roll(accel, static_accel);
@@ -98,6 +98,11 @@ features.Properties.VariableNames = {...
     'frequency_x', 'frequency_y', 'frequency_z', ...
     'pitch', 'roll'
 };
+
+features = [features, basic_stats];
+
+writetable([features, table(label_names)], ...
+            "Features/features-raw.csv");
 
 %% Split and Preprocess Data
 disp("Generating sample sets...");
@@ -138,14 +143,19 @@ writetable([test_features, table(test_labels, ...
 
 % Create bootstrap samples for classifiers
 % Matlab does not support 3D tables, so we will use cell arrays instead
-bootstrap_features = cell(bootstrap_samples, 1);
-bootstrap_labels = cell(bootstrap_samples, 1);
-for i=1:bootstrap_samples
-   [bfs, bls] = ...
-        make_bootstrap_sample(training_features, training_labels, ...
-        bootstrap_ratio, bootstrap_classes);
-   bootstrap_features{i} = bfs;
-   bootstrap_labels{i} = bls;
+if enable_bootstrap
+    bootstrap_features = cell(bootstrap_samples, 1);
+    bootstrap_labels = cell(bootstrap_samples, 1);
+    for i=1:bootstrap_samples
+       [bfs, bls] = ...
+            make_bootstrap_sample(training_features, training_labels, ...
+            bootstrap_ratio, bootstrap_classes);
+       bootstrap_features{i} = bfs;
+       bootstrap_labels{i} = bls;
+    end
+else
+    bootstrap_features = {training_features};
+    bootstrap_labels = {training_labels};
 end
 
 disp("Bootstrap sample amounts:");
@@ -171,8 +181,8 @@ for i=1:bootstrap_samples
        bootstrap_probabilities(:,:,i)] = predict(trainer, test_features);
 end
 
-%% Get general confusion matrix
-% Use majority vote to make predictions
+%% Get confusion matrix, precision, recall
+% Make predictions from majority vote of bootstrap samples
 prediction_counts = zeros(length(bootstrap_predictions), length(label_categories));
 for i=1:length(label_categories)
     prediction_counts(:,i) = sum(bootstrap_predictions == label_categories{i}, 2);
@@ -180,34 +190,54 @@ end
 [~, predictions] = max(prediction_counts, [], 2);
 predictions = categorical(label_categories(predictions));
 
-% Find information about a class
-true_pos_preds  = zeros(4, 1);
-false_pos_preds = zeros(4, 1);
-true_neg_preds  = zeros(4, 1);
-false_neg_preds = zeros(4, 1);
+% We need to sanitize the class names so that they look like variables
+% Not really comprehensive, but good enough for our purposes
+san_label_categories = cell(size(label_categories));
 for i=1:length(label_categories)
-    cat = label_categories{i};
-    disp(cat);
-    disp("=======");
-    true_pos_preds(i)  = sum(predictions == cat & test_labels == cat);
-    false_pos_preds(i) = sum(predictions == cat & test_labels ~= cat);
-    true_neg_preds(i)  = sum(predictions ~= cat & test_labels ~= cat);
-    false_neg_preds(i) = sum(predictions ~= cat & test_labels == cat);
-    
-    total = length(test_labels);
-    confusion_matrix = table(...
-        [true_neg_preds(i); false_neg_preds(i)], ...
-        [false_pos_preds(i); true_pos_preds(i)], ...
-        'VariableNames', {'Not_Predicted', 'Predicted'}, ...
-        'RowNames', {'Not_Actual', 'Actual'});
-    disp(confusion_matrix);
-    
-    precision = true_pos_preds(i) / (true_pos_preds(i) + false_pos_preds(i));
-    recall = true_pos_preds(i) / (true_pos_preds(i) + false_neg_preds(i));
-    disp("Precision: " + precision);
-    disp("Recall: " + recall);
-    disp("");
+    name = label_categories{i};
+    if isvarname(name)
+        san_label_categories{i} = name;
+    else
+        name(name=='-' | name==' ') = '_';
+        san_label_categories{i} = name;
+    end
 end
+
+sa = zeros(length(label_categories), 1);
+confusion_matrix = table(sa, sa, sa, sa, ...
+    'VariableNames', san_label_categories, ...
+    'RowNames', san_label_categories ...
+);
+for actual_i=1:length(label_categories)
+   actual = label_categories{actual_i};
+   for predicted_i=1:length(label_categories)
+       predicted = label_categories{predicted_i};
+       % Find the number of samples with the label {actual}
+       % that were classified as {predicted} by the classifier
+       actual_obvs = (test_labels == actual);
+       predicted_obvs = (predictions == predicted);
+       matches = sum(actual_obvs & predicted_obvs);
+       confusion_matrix{actual_i,predicted_i} = matches;
+   end
+end
+disp('Columns are predicted, rows actual');
+disp(confusion_matrix);
+
+precision = 0.0;
+recall = 0.0;
+for i=1:length(label_categories)
+    tps = confusion_matrix{i,i};
+    tps_and_fps = sum(confusion_matrix{:,i});
+    tps_and_fns = sum(confusion_matrix{i,:});
+    precision = precision + tps / tps_and_fps;
+    recall = recall + tps / tps_and_fns;
+end
+precision = precision / length(label_categories);
+recall = recall / length(label_categories);
+
+disp("Macro-Averages");
+disp("Precision: " + precision);
+disp("Recall: " + recall);
 
 %% Plot ROC Curves
 % An ROC curve for a given class plots TP rate against FP rate for various
@@ -272,7 +302,7 @@ true_positive_rate = true_positives ./ (true_positives + false_negatives);
 false_positive_rate = false_positives ./ (false_positives + true_negatives);
 
 hold on
-stairs(false_positive_rate, true_positive_rate, "-*");
+stairs(false_positive_rate, true_positive_rate);
 plot([0,1], [0,1],'--');
 legend(label_categories, 'Location', 'southeast');
 xlabel("False Positive Rate");

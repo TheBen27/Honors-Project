@@ -8,18 +8,53 @@
 % We will then draw a box-and-whiskers chart to show in more detail
 % what this means.
 
-load('SLICES.MAT'); % loads TIME_SLICES
+slice_name = {'large-slice', 'small-slice'};
+window_size = 50 - 24;
+window_overlap = 12;
 
-slice_name = {'many-turns', 'medley-1'};
-window_size = 16;
-window_overlap = 8;
-
-feature = @(acc) feature_accel(acc, 2, 3);
+histogram_title = 'Modified Lateral Acceleration';
+histogram_bin_width = 0.05;
 
 [accel, times, label_times, label_names] = ...
     load_accel_slice_windowed(slice_name, window_size, ...
     window_overlap);
 
-processed = feature(accel);
+processed = feature_means_extreme(accel);
+processed = processed(:,3);
 
+cats = categories(label_names);
+% Turning
+f = figure;
+histogram(processed(label_names == 'L-turn'), 20, ...
+    'Normalization', 'probability', 'BinWidth', histogram_bin_width);
+hold on;
+histogram(processed(label_names == 'R-turn'), 20, ...
+    'Normalization', 'probability', 'BinWidth', histogram_bin_width);
+legend({'L-turn', 'R-turn'});
+xlabel('Acceleration (g''s)');
+ylabel('Probability');
+title([histogram_title ' - Turning Behaviors']);
+saveas(f, 'histogram-turning.svg');
+hold off;
+
+% Clockwise/Anticlockwise
+f = figure;
+histogram(processed(label_names == 'anticlockwise'), 20, ...
+    'Normalization', 'probability', 'BinWidth', histogram_bin_width);
+hold on;
+histogram(processed(label_names == 'clockwise'), 20, ...
+    'Normalization', 'probability', 'BinWidth', histogram_bin_width);
+title('');
+legend({'Counterclockwise', 'Clockwise'});
+xlabel('Acceleration (g''s)');
+ylabel('Probability');
+title([histogram_title ' - Non-Turning Behaviors']);
+saveas(f, 'histogram-straight.svg');
+hold off;
+
+% ANOVA and Box-and-Whiskers
+figure;
 anova1(processed, label_names);
+title(histogram_title)
+xlabel('Class');
+ylabel('Distinctiveness (Unitless)');

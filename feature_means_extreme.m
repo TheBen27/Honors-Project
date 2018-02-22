@@ -12,7 +12,11 @@ function [means] = feature_means_extreme(accel)
 % negatives = total - positives
 % positives >= total - positives
 % 2 * positives >= total
-positives = sum(accel > 0);
+
+% Use overall mean acceleration instead of 0 as threshold
+threshold = mean(mean(accel), 3);
+
+positives = sum(accel > threshold);
 positives = permute(positives, [3, 2, 1]);
 totals = size(accel,1);
 
@@ -21,8 +25,8 @@ means = zeros(size(accel, 3), size(accel, 2));
 for w=1:size(accel,3)
    win = accel(:,:,w);
    has_pos = has_more_positives(w,:);
-   more_pos = mean(win(win>0));
-   more_neg = mean(win(win<=0));
+   more_pos = mean(win(win>threshold));
+   more_neg = mean(win(win<=threshold));
    % Ugly, but it works
    % Remember that mean([]) == NaN
    more_pos(isnan(more_pos)) = 0.0;

@@ -13,20 +13,20 @@ function [ distinctiveness, frequency ] = feature_tailbeat( ...
 % Get PSD and filter frequencies via brickwall
 nfft = 30 * size(accel, 1);
 freqs = sample_rate * (-nfft/2:nfft/2-1)/nfft;
+freqs_assym = (freqs > 0);
 freqs_off_range = (freqs < high_pass) | (freqs > low_pass);
 
-accel_fft = fftshift(fft(accel,  nfft, 1), 1);
+accel_fft = abs(fftshift(fft(accel,  nfft, 1), 1));
+accel_fft_raw = abs(accel_fft);
 accel_fft(freqs_off_range, :, :) = [];
+accel_fft_raw(freqs_assym, :, :) = [];
 freqs(freqs_off_range) = [];
 
-accel_pow = accel_fft .* conj(accel_fft) / (nfft * size(accel, 1));
-
-[tail_amp, tail_ind] = max(accel_pow, [], 1); % each are 1xCxW
+[tail_amp, tail_ind] = max(accel_fft, [], 1); % each are 1xCxW
 
 frequency = freqs(tail_ind);
 
-% TODO get energy from each window?
-energy = mean(accel_pow, 1);
+energy = mean(accel_fft_raw, 1);
 distinctiveness = tail_amp ./ energy;
 
 distinctiveness = permute(distinctiveness, [3, 2, 1]);
