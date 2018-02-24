@@ -30,13 +30,19 @@ roc_thresholds = linspace(0, 1, 1500);
 
 % Percent of data that goes to the training set; the rest goes to
 % the test set.
-training_set_portion = 0.7;
+training_set_portion = 0.8;
+
+% Whether to use Principal Component Analysis, which converts
+% the feature set such that certain features are known to have higher
+% variance than others.
+use_pca = true;
+pca_threshold = 0.05;
 
 % Number of bootstrap classifiers to create
 % Each classifier is made from a sample taken with replacement from the
 % original training set, with majority classes undersampled until they
 % match minority classes.
-enable_bootstrap = false;
+enable_bootstrap = true;
 bootstrap_samples = 7;
 bootstrap_ratio = 1.0;
 bootstrap_classes = categorical({'clockwise', 'anticlockwise'})';
@@ -46,6 +52,7 @@ undersample_straight_swimming = true;
 if ~enable_bootstrap
    bootstrap_samples = 1; 
 end
+
 
 %% Load and preprocess data
 [accel, times, label_times, label_names] = ... 
@@ -103,6 +110,15 @@ features = [features, basic_stats];
 
 writetable([features, table(label_names)], ...
             "Features/features-raw.csv");
+
+% PCA
+if use_pca
+   features_arr = table2array(features);
+   [coeff, score, latent] = pca(features_arr);
+   nfeats = find(latent < pca_threshold, 1) - 1;
+   features = array2table(features_arr * coeff(:, 1:nfeats));
+   disp("After PCA, has " + nfeats + " features");
+end
 
 %% Split and Preprocess Data
 disp("Generating sample sets...");
