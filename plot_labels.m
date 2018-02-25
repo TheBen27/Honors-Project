@@ -22,6 +22,10 @@ end
 
 line(xs, ys, 'Color', line_color);
 
+for ni=1:length(names)
+    names{ni} = names{ni}(1);
+end
+
 txs = xs(1, 1:length(names));
 tys = ys(2, 1:length(names));
 text(txs, tys, names);

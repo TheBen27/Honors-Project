@@ -1,4 +1,4 @@
-function [ accel, times, label_times, label_names ] = ...
+function [ accel, times, label_times, label_names, label_categories ] = ...
     load_accel_slice_windowed( slice_names, window_size, window_overlap )
 % LOAD_ACCEL_SLICE_WINDOWED Convert a slice of accelerometer data and split
 % it into overlapping windows.
@@ -54,6 +54,19 @@ for win=1:num_windows
     end
     label_times(win) = label_times_r(most_prevalent_ind);
     label_names(win) = label_names_r(most_prevalent_ind);
+end
+
+% Give a summary of the base probabilities of each label
+label_categories = categories(label_names);
+
+disp("");
+disp("WINDOW FREQUENCIES");
+for cat_i = 1:length(label_categories)
+    cat = label_categories{cat_i};
+    cat_pos = sum(label_names == cat);
+    cat_perc = cat_pos / length(label_names);
+    disp(cat + ": " + cat_pos + "/" + length(label_names) + ...
+        " (" + cat_perc * 100 + "%)");
 end
 
 end

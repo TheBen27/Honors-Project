@@ -10,14 +10,12 @@ if ~iscell(slice_names)
    slice_names = {slice_names}; 
 end
 
-% average turn duration:
-%   - mean = 2.1s
-%   - std  = 0.8s
-
 accel_out = [];
 times_out = [];
 label_times = [];
 label_names = {};
+
+cat_durations = [];
 
 for slice_i = 1:length(slice_names)
     slice_name = slice_names{slice_i}; 
@@ -47,6 +45,13 @@ for slice_i = 1:length(slice_names)
        [new_label_times, new_label_names] = import_labels(slice.labels_file);
        label_times = [label_times ; new_label_times];
        label_names = [label_names ; new_label_names];
+       
+       new_durations = get_behavior_freqs(new_label_times, new_label_names);
+       if isempty(cat_durations)
+           cat_durations = new_durations;
+       else
+           cat_durations = cat_durations + new_durations;
+       end
     end
     
     data_set = slice.data_set;
@@ -59,7 +64,17 @@ for slice_i = 1:length(slice_names)
     
     accel_out = [accel_out ; new_accel];
     times_out = [times_out ; new_times];
+    
+    
 end
 
+total_time = sum(cat_durations);
+cats = unique(label_names);
+for ci=1:length(cat_durations)
+    cat = cats{ci};
+    disp("Time in " + cat + ": " + char(cat_durations(ci)) + ...
+         " (" + 100 * cat_durations(ci) / total_time + "%)");
+end
+ 
 end
 

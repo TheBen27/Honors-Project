@@ -9,7 +9,7 @@ rng(3);
 % Cell array of data slices to use. These should all be labeled.
 slice_name = {'many-turns', 'medley-1', 'medley-2', 'large-slice', 'small-slice'};
 
-sample_rate = 20;
+sample_rate = 25;
 
 % Each window has (window_size + window_overlap) samples. Overlapping
 % samples are shared with a window's neighbors.
@@ -23,6 +23,18 @@ window_overlap = 12;
 % dynamic acceleration.
 static_filter_order = 3;
 static_filter_cutoff = 0.6;
+
+% The cost of classifying a point into class j if its true class is i
+classifier_cost = ones(4) - eye(4);
+% The cost of classifying L-turn/R-turn as counterclockwise/clockwise
+% should be high
+classifier_cost(1,3) = 5;
+classifier_cost(1,4) = 5;
+classifier_cost(2,3) = 5;
+classifier_cost(2,4) = 5;
+
+% SVM Learning template
+svm_template = templateSVM('KernelFunction', 'Gaussian');
 
 % Thresholds for the ROC curve to check.
 % Should be a row vector.
@@ -45,7 +57,7 @@ pca_threshold = 0.05;
 enable_bootstrap = true;
 bootstrap_samples = 7;
 bootstrap_ratio = 1.0;
-bootstrap_classes = categorical({'clockwise', 'anticlockwise'})';
+bootstrap_classes = {'clockwise', 'anticlockwise'};
 
 undersample_straight_swimming = true;
 
@@ -55,61 +67,11 @@ end
 
 
 %% Load and preprocess data
-[accel, times, label_times, label_names] = ... 
+[accel, times, label_times, label_names, label_categories] = ... 
     load_accel_slice_windowed(slice_name, window_size, window_overlap);
 
-label_categories = categories(label_names);
-
-% Give a summary of the base probabilities of each label
-disp("");
-disp("BASE FREQUENCIES");
-for cat_i = 1:length(label_categories)
-    cat = label_categories{cat_i};
-    cat_pos = sum(label_names == cat);
-    cat_perc = cat_pos / length(label_names);
-    disp(cat + ": " + cat_pos + "/" + length(label_names) + ...
-        " (" + cat_perc * 100 + "%)");
-end
-
-%% Generate data to use in features
-[low_b, low_a] = butter(static_filter_order, static_filter_cutoff / sample_rate);
-static_accel = filter(low_b, low_a, accel, [], 1);
-dynamic_accel = accel - static_accel;
-
-%% Make feature table
-disp("Generating features...");
-basic_stats = feature_basic_stats(accel);
-means = feature_means_extreme(accel);
-odba = feature_odba(dynamic_accel);
-[pitch, roll] = feature_pitch_and_roll(accel, static_accel);
-
-[tail_distinct, tail_freq] = feature_tailbeat(accel, sample_rate, 0.8, 1.6);
-
-features = table(...
-    means(:,1), ...
-    means(:,2), ...
-    means(:,3), ...
-    odba,...
-    tail_distinct(:, 1), ...
-    tail_distinct(:, 2), ...
-    tail_distinct(:, 3), ...
-    tail_freq(:, 1), ....
-    tail_freq(:, 2), ....
-    tail_freq(:, 3), ....
-    pitch, roll...
-);
-features.Properties.VariableNames = {...
-    'means_x', 'means_y', 'means_z', ...
-    'odba', ...
-    'distinctiveness_x', 'distinctiveness_y', 'distinctiveness_z', ...
-    'frequency_x', 'frequency_y', 'frequency_z', ...
-    'pitch', 'roll'
-};
-
-features = [features, basic_stats];
-
-writetable([features, table(label_names)], ...
-            "Features/features-raw.csv");
+features = build_feature_table(accel, label_names, sample_rate, ...
+    static_filter_order, static_filter_cutoff, true);
 
 % PCA
 if use_pca
@@ -183,16 +145,15 @@ end
 %% Generate classifier
 disp("Training classifiers...");
 
-% Train and predict
-svm_template = templateSVM('KernelFunction', 'Gaussian');
-
 bootstrap_probabilities = zeros(height(test_features), ...
     length(label_categories), bootstrap_samples);
 bootstrap_predictions = repmat(test_labels(1), height(test_features), bootstrap_samples);
 for i=1:bootstrap_samples
    disp("Fitting bootstrap " + i + "...");
    trainer = fitcecoc(bootstrap_features{i}, bootstrap_labels{i}, ...
-       'FitPosterior', 1, 'Learners', svm_template);
+       'FitPosterior', 1, 'Learners', svm_template, ...
+       'OptimizeHyperparameters', 'auto', ...
+       'Cost', classifier_cost);
    [bootstrap_predictions(:,i), ~, ~, ...
        bootstrap_probabilities(:,:,i)] = predict(trainer, test_features);
 end

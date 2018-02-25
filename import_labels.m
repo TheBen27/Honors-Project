@@ -5,7 +5,12 @@ function [ times, names ] = import_labels( filename )
 %   and names being potentially blank
 
 table = readtable(filename, 'delimiter', ',');
-times = datetime(table.time, 'InputFormat', 'yyyy/MM/dd HH:mm:ss');
+if any(table.time{1} == '.')
+   times = datetime(table.time, 'InputFormat', 'yyyy/MM/dd HH:mm:ss.SS');
+else
+   times = datetime(table.time, 'InputFormat', 'yyyy/MM/dd HH:mm:ss');
+end
+
 names = table.activity;
 
 end
