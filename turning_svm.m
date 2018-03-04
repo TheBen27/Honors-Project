@@ -1,5 +1,5 @@
 %% Simple SVM for Turning Detection
-% A binary SVM for detecting turning.
+% A multiclass SVM for detecting turning.
 % ... Well, it used to be simple, anyway.
 %% Configuration
 
@@ -7,7 +7,10 @@
 rng(3);
 
 % Cell array of data slices to use. These should all be labeled.
-slice_name = {'many-turns', 'medley-1', 'medley-2', 'large-slice', 'small-slice'};
+slice_name = {...
+    'many-turns', 'medley-1', 'medley-2', 'large-slice', 'small-slice', ...
+    'rturn-fun', 'afternoon', 'precise', 'sb34-slice-1'...
+};
 
 sample_rate = 25;
 
@@ -16,8 +19,8 @@ sample_rate = 25;
 %
 % Data at the end of the set that does not fit squarely within a window is
 % cut off.
-window_size = 26;
-window_overlap = 12;
+window_size = 20;
+window_overlap = 16;
 
 % Configuration of the butterworth filter dividing static and
 % dynamic acceleration.
@@ -33,6 +36,14 @@ classifier_cost(1,4) = 5;
 classifier_cost(2,3) = 5;
 classifier_cost(2,4) = 5;
 
+% Only include certain features
+feature_whitelist = true;
+included_features = {...
+	'distinctiveness_y', 'frequency_y', 'mean_z', 'std_x', 'std_y', ...
+	'skew_z', 'mini_x', 'mini_y', 'mini_z', 'maxi_y', ...
+	'maxi_z', 'energy_x', 'roll_mean', 'dpitch_skew'
+};
+
 % SVM Learning template
 svm_template = templateSVM('KernelFunction', 'Gaussian');
 
@@ -47,7 +58,7 @@ training_set_portion = 0.8;
 % Whether to use Principal Component Analysis, which converts
 % the feature set such that certain features are known to have higher
 % variance than others.
-use_pca = true;
+use_pca = false;
 pca_threshold = 0.05;
 
 % Number of bootstrap classifiers to create
@@ -70,8 +81,19 @@ end
 [accel, times, label_times, label_names, label_categories] = ... 
     load_accel_slice_windowed(slice_name, window_size, window_overlap);
 
-features = build_feature_table(accel, label_names, sample_rate, ...
+raw_features = build_feature_table(accel, label_names, sample_rate, ...
     static_filter_order, static_filter_cutoff, true);
+
+features = table();
+
+if feature_whitelist
+    for wi=1:length(included_features)
+       inc_feat = included_features{wi};
+       features.(inc_feat) = raw_features.(inc_feat);
+   end
+else
+   features = raw_features;
+end
 
 % PCA
 if use_pca
@@ -148,12 +170,14 @@ disp("Training classifiers...");
 bootstrap_probabilities = zeros(height(test_features), ...
     length(label_categories), bootstrap_samples);
 bootstrap_predictions = repmat(test_labels(1), height(test_features), bootstrap_samples);
-for i=1:bootstrap_samples
+trainers = {};
+parfor i=1:bootstrap_samples
    disp("Fitting bootstrap " + i + "...");
    trainer = fitcecoc(bootstrap_features{i}, bootstrap_labels{i}, ...
        'FitPosterior', 1, 'Learners', svm_template, ...
-       'OptimizeHyperparameters', 'auto', ...
+       'OptimizeHyperparameters', 'none', ...
        'Cost', classifier_cost);
+   trainers = [trainers, {trainer}];
    [bootstrap_predictions(:,i), ~, ~, ...
        bootstrap_probabilities(:,:,i)] = predict(trainer, test_features);
 end

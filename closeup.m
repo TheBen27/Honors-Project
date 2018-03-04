@@ -7,8 +7,8 @@
 slice_name = 'rturn-only';
 
 % Turning these off might result in faster processing.
-plot_raw_accel = false;
-plot_psds = false;
+plot_raw_accel = true;
+plot_psds = true;
 plot_spectrograms = false; % Won't work on smaller segments
 plot_orientation = true;
 
@@ -36,7 +36,7 @@ end
 
 % Precision of the PSD and the spectrograms. For spectrograms, this
 % controls the vertical precision; higher values take more CPu.
-psd_nfft = 2048;
+psd_nfft = 57;
 
 % Essentially the horizontal precision of the spectrogram. Too high and
 % you'll lose detail; too low and you'll start getting weird artifacts.
@@ -119,6 +119,7 @@ end
 % Subtract mean to remove DC offset and center signal
 % TODO Figure out if that idea is at all sensible
 accel_high = accel - repmat(mean(accel),size(accel,1),1);
+
 
 %% Get Power Spectral Distributions
 if plot_psds

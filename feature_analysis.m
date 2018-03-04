@@ -8,21 +8,28 @@
 % We will then draw a box-and-whiskers chart to show in more detail
 % what this means.
 
-slice_name = {'large-slice', 'small-slice'};
+slice_name = {'many-turns', 'medley-1', 'medley-2', 'large-slice', 'small-slice'};
 window_size = 50 - 24;
 window_overlap = 12;
 
-histogram_title = 'Modified Lateral Acceleration';
-histogram_bin_width = 0.05;
+histogram_title = 'ODBA';
+histogram_bin_width = 0.02;
 
 [accel, times, label_times, label_names] = ...
     load_accel_slice_windowed(slice_name, window_size, ...
     window_overlap);
 
-processed = feature_means_extreme(accel);
-processed = processed(:,3);
+processed = feature_odba(accel);
 
 cats = categories(label_names);
+
+% Basics
+for ci=1:length(cats)
+   cat = cats{ci};
+   disp(cat + " mean: " + mean(processed(label_names == cat)));
+   disp(cat + " std-dev: " + std(processed(label_names == cat)));
+end
+
 % Turning
 f = figure;
 histogram(processed(label_names == 'L-turn'), 20, ...
@@ -57,4 +64,4 @@ figure;
 anova1(processed, label_names);
 title(histogram_title)
 xlabel('Class');
-ylabel('Distinctiveness (Unitless)');
+ylabel('ODBA (g''s)');
