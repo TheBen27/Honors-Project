@@ -1,6 +1,6 @@
 %% Build raw feature table from accelerometer data
 function [features] = build_feature_table(...
-    accel, label_names, sample_rate, order, cutoff, save)
+    accel, sample_rate, order, cutoff)
 
     %% Generate data to use in features
     [low_b, low_a] = butter(order, cutoff / sample_rate);
@@ -37,10 +37,5 @@ function [features] = build_feature_table(...
 
     features = [features, basic_stats];
     features = [features, pitch_and_roll];
-    
-    if save
-        writetable([features, table(label_names)], ...
-                    "Features/features-raw.csv");
-    end
 
 end

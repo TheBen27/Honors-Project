@@ -29,20 +29,29 @@ static_filter_cutoff = 0.6;
 
 % The cost of classifying a point into class j if its true class is i
 classifier_cost = ones(4) - eye(4);
-% The cost of classifying L-turn/R-turn as counterclockwise/clockwise
-% should be high
-classifier_cost(1,3) = 5;
-classifier_cost(1,4) = 5;
-classifier_cost(2,3) = 5;
-classifier_cost(2,4) = 5;
+%~classifier_cost = ...
+%~    ... L    R    A    C (Predicted class)
+%~    [   0, 0.2,   5,   5; ... % L (Actual classs)
+%~      0.2,   0,   5,   5; ... % R
+%~        1,   1,   0, 0.2; ... % A
+%~        1,   1, 0.2,   0];    % C
+
+optimization_mode = 'none';
 
 % Only include certain features
 feature_whitelist = true;
 included_features = {...
-	'distinctiveness_y', 'frequency_y', 'mean_z', 'std_x', 'std_y', ...
-	'skew_z', 'mini_x', 'mini_y', 'mini_z', 'maxi_y', ...
-	'maxi_z', 'energy_x', 'roll_mean', 'dpitch_skew'
+	'distinctiveness_y', ...
+	'std_x', ...
+	'std_y', ...
+	'min_x', ...
+	'max_z', ...
+	'energy_x', ...
+	'cor_xy', ...
+	'min_y', ...
+	'frequency_y' ...
 };
+
 
 % SVM Learning template
 svm_template = templateSVM('KernelFunction', 'Gaussian');
@@ -65,24 +74,37 @@ pca_threshold = 0.05;
 % Each classifier is made from a sample taken with replacement from the
 % original training set, with majority classes undersampled until they
 % match minority classes.
-enable_bootstrap = true;
-bootstrap_samples = 7;
-bootstrap_ratio = 1.0;
-bootstrap_classes = {'clockwise', 'anticlockwise'};
+resampling_method = 'resample'; % resample, bootstrap, none
 
-undersample_straight_swimming = true;
+% General params
+bootstrap_samples = 11;
 
-if ~enable_bootstrap
+% Bootstrap params
+bootstrap_ratio = 2.0;
+bootstrap_majority_classes = {'clockwise', 'anticlockwise'};
+
+% Resample parameters
+bootstrap_minority_classes = {'L-turn', 'R-turn'};
+smote_k = 6;
+smote_amt = 3;
+minor_ratio = 0.8;
+major_ratio = 1.0;
+
+if strcmp(resampling_method, 'none')
    bootstrap_samples = 1; 
 end
+
+undersample_straight_swimming = true;
 
 
 %% Load and preprocess data
 [accel, times, label_times, label_names, label_categories] = ... 
     load_accel_slice_windowed(slice_name, window_size, window_overlap);
 
-raw_features = build_feature_table(accel, label_names, sample_rate, ...
-    static_filter_order, static_filter_cutoff, true);
+raw_features = build_feature_table(accel, sample_rate, ...
+    static_filter_order, static_filter_cutoff);
+
+writetable([raw_features, table(label_names)], "Features/features-raw.csv");
 
 features = table();
 
@@ -143,15 +165,23 @@ writetable([test_features, table(test_labels, ...
 
 % Create bootstrap samples for classifiers
 % Matlab does not support 3D tables, so we will use cell arrays instead
-if enable_bootstrap
+if ~strcmp(resampling_method, 'none')
     bootstrap_features = cell(bootstrap_samples, 1);
     bootstrap_labels = cell(bootstrap_samples, 1);
-    for i=1:bootstrap_samples
-       [bfs, bls] = ...
-            make_bootstrap_sample(training_features, training_labels, ...
-            bootstrap_ratio, bootstrap_classes);
-       bootstrap_features{i} = bfs;
-       bootstrap_labels{i} = bls;
+    
+    for bs=1:bootstrap_samples
+        if strcmp(resampling_method, 'resample')
+           [bootstrap_features{bs}, bootstrap_labels{bs}] = ...
+                resample_feature_table(training_features, training_labels, ...
+                bootstrap_minority_classes, smote_amt, smote_k, ...
+                minor_ratio, major_ratio); 
+        elseif strcmp(resampling_method, 'bootstrap')
+           [bootstrap_features{bs}, bootstrap_labels{bs}] = ...
+               make_bootstrap_sample(training_features, training_labels, ...
+               bootstrap_ratio, bootstrap_majority_classes);
+        else
+            error(['Invalid resample method: ' resample_method]);
+        end
     end
 else
     bootstrap_features = {training_features};
@@ -171,18 +201,18 @@ bootstrap_probabilities = zeros(height(test_features), ...
     length(label_categories), bootstrap_samples);
 bootstrap_predictions = repmat(test_labels(1), height(test_features), bootstrap_samples);
 trainers = {};
-parfor i=1:bootstrap_samples
+for i=1:bootstrap_samples
    disp("Fitting bootstrap " + i + "...");
    trainer = fitcecoc(bootstrap_features{i}, bootstrap_labels{i}, ...
        'FitPosterior', 1, 'Learners', svm_template, ...
-       'OptimizeHyperparameters', 'none', ...
+       'OptimizeHyperparameters', optimization_mode, ...
        'Cost', classifier_cost);
    trainers = [trainers, {trainer}];
    [bootstrap_predictions(:,i), ~, ~, ...
        bootstrap_probabilities(:,:,i)] = predict(trainer, test_features);
 end
 
-%% Get confusion matrix, precision, recall
+%% Get confusion matrix, simple predictive measures
 % Make predictions from majority vote of bootstrap samples
 prediction_counts = zeros(length(bootstrap_predictions), length(label_categories));
 for i=1:length(label_categories)
@@ -226,19 +256,32 @@ disp(confusion_matrix);
 
 precision = 0.0;
 recall = 0.0;
+accuracy = 0.0;
 for i=1:length(label_categories)
     tps = confusion_matrix{i,i};
     tps_and_fps = sum(confusion_matrix{:,i});
     tps_and_fns = sum(confusion_matrix{i,:});
     precision = precision + tps / tps_and_fps;
     recall = recall + tps / tps_and_fns;
+    %accuracy = (TP + TN) / (P + N)
+    % TP = confusion_matrix{i,i};
+    % TN = confusion_matrix{all but i, :} = length(test_labels) - tps_and_fns
+    % P = sum(confusion_matrix{i, :}) == tps_and_fns
+    % N = length(test_labels) - P
+    tp = confusion_matrix{i,i};
+    tn = length(test_labels) - tps_and_fns;
+    p = tps_and_fns;
+    n = length(test_labels) - p;
+    accuracy = accuracy + (tp + tn) / (p + n);
 end
 precision = precision / length(label_categories);
 recall = recall / length(label_categories);
+accuracy = accuracy / length(label_categories);
 
 disp("Macro-Averages");
 disp("Precision: " + precision);
 disp("Recall: " + recall);
+disp("Accuracy: " + accuracy);
 
 %% Plot ROC Curves
 % An ROC curve for a given class plots TP rate against FP rate for various
@@ -302,10 +345,22 @@ true_positive_rate = true_positives ./ (true_positives + false_negatives);
 % negatives detected
 false_positive_rate = false_positives ./ (false_positives + true_negatives);
 
+% Plot individual ROC Curves
 hold on
 stairs(false_positive_rate, true_positive_rate);
 plot([0,1], [0,1],'--');
 legend(label_categories, 'Location', 'southeast');
+xlabel("False Positive Rate");
+ylabel("True Positive Rate");
+hold off
+
+% Plot macro-average ROC curve
+mean_false_positive_rate = mean(false_positive_rate, 2);
+mean_true_positive_rate = mean(true_positive_rate, 2);
+hold on
+stairs(mean_false_positive_rate, mean_true_positive_rate);
+plot([0,1], [0,1], '--');
+title("Macro-Average ROC");
 xlabel("False Positive Rate");
 ylabel("True Positive Rate");
 hold off

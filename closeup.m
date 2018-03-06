@@ -4,15 +4,17 @@
 %% Configuration
 
 % Name of the slice from SLICES.MAT
-slice_name = 'rturn-only';
+slice_name = 'rturn-2';
 
 % Turning these off might result in faster processing.
-plot_raw_accel = true;
-plot_psds = true;
+plot_raw_accel = false;
+plot_psds = false;
 plot_spectrograms = false; % Won't work on smaller segments
-plot_orientation = true;
+plot_orientation = false;
+plot_delta_orientation = true;
 
-if (~(plot_raw_accel || plot_psds || plot_spectrograms || plot_orientation))
+if (~(plot_raw_accel || plot_psds || plot_spectrograms || ...
+        plot_orientation || plot_delta_orientation))
     error(['Script is configured to not plot anything. ' ...
            'Go to closeup.m''s configuration section to change this']);
 end
@@ -44,7 +46,7 @@ psd_nfft = 57;
 spectral_window = sample_rate * 3;
 
 % Controls the maximum frequency plotted in the PSDs.
-psd_maxFreq = 2.0;
+psd_maxFreq = 8.0;
 
 %% Loading and Preprocessing
 [accel, times, label_times, label_names] = load_accel_slice(slice_name);
@@ -66,8 +68,8 @@ if plot_windows
     window_starts = start_time + seconds(window_starts_is / sample_rate);
     window_ends = start_time + seconds(window_ends_is / sample_rate);
 else
-    window_starts = []
-    window_ends = []
+    window_starts = [];
+    window_ends = [];
 end
 
 %% Plotting Raw Acceleration
@@ -123,28 +125,13 @@ accel_high = accel - repmat(mean(accel),size(accel,1),1);
 
 %% Get Power Spectral Distributions
 if plot_psds
-    sample_rate = 25;
-    accel_fft = fftshift(fft(accel_high, psd_nfft, 1));
-    accel_power = accel_fft .* conj(accel_fft) / (psd_nfft * size(accel,1));
-
-    f = sample_rate * (-psd_nfft/2:psd_nfft/2-1)/psd_nfft;
-
-    % Remove all negative frequencies
-    neg_fs = f < 0;
-    f(neg_fs) = [];
-    accel_fft(neg_fs,:) = [];
-    accel_power(neg_fs,:) = [];
-
     figure;
-    psd_axes = [0, psd_maxFreq, 0, max(max(accel_power))];
-    psd_labels = {'X','Y','Z'};
+    labels = {'X', 'Y', 'Z'};
     for i=1:3
         subplot(3, 1, i);
-        plot(f,accel_power(:,i));
-        title(['Power Spectral Distribution (', psd_labels{i}, ')']);
-        xlabel('Frequency (Hz)');
-        ylabel('Power (???)');
-        axis(psd_axes);
+        periodogram(accel(:, i), hanning(length(accel)), [], 25);
+        ylim([-100, 5]);
+        title(['Power Spectral Density ', labels{i}]);
     end
 end
 
@@ -168,7 +155,7 @@ end
 
 
 %% Plot pitch and roll
-if plot_orientation
+if plot_orientation || plot_delta_orientation
     [low_b, low_a] = butter(3, 15 / sample_rate);
     static_accel = filter(low_b, low_a, accel, [], 1);
     dynamic_accel = accel - static_accel;
@@ -179,14 +166,19 @@ if plot_orientation
     mean_x = mean(accel(:,1));
 
     all_pitches = asin(low_x - mean_x) * (180 / pi);
-    all_rolls = atan(-low_z / low_y) * (180 / pi);
-    
-    % We need to expand rolls to avoid wraparound problems?
+    all_rolls = atan(-low_z ./ low_y) * (180 / pi);
+end
+
+if plot_orientation
+    % Centered vertically with a little leeway
+    extent_y = max(abs([all_pitches ; all_rolls]));
+    extent_y = ceil(extent_y / 45) * 45;
     
     figure;
     raw_xlims = [times(1), times(end)]; 
-    raw_ylims = [-180, 180];
+    raw_ylims = [-extent_y, extent_y];
     subplot(2,1,1);
+    hold on
     plot(times, all_pitches);
     title('Pitch');
     xlim(raw_xlims);
@@ -196,8 +188,10 @@ if plot_orientation
     plot_labels(label_times, label_names);
     plot_labels(window_starts, cellstr(window_names), 'Green');
     plot_labels(window_ends, {}, 'Red');
+    hold off
     
     subplot(2,1,2);
+    hold on
     plot(times, all_rolls);
     title('Roll');
     xlim(raw_xlims);
@@ -207,4 +201,32 @@ if plot_orientation
     plot_labels(label_times, label_names);
     plot_labels(window_starts, cellstr(window_names), 'Green');
     plot_labels(window_ends, {}, 'Red');
+    hold off
+end
+
+if plot_delta_orientation
+   delta_pitch = (all_pitches(2:end) - all_pitches(1:(end-1))) * sample_rate;
+   delta_roll = (all_rolls(2:end) - all_rolls(1:(end-1))) * sample_rate;
+   new_times = times(2:end);
+   
+   extent = max(abs([delta_pitch ; delta_roll]));
+   extent = ceil(extent / 45) * 45;
+   
+   subplot(2,1,1);
+   hold on
+   plot(new_times, delta_pitch);
+   title('Angular Velocity (Pitch)');
+   ylim([-extent, extent]);
+   xlabel('Time (s)');
+   ylabel('Angular Velocity (°/s)');
+   hold off
+   
+   subplot(2, 1, 2);
+   hold on
+   plot(new_times, delta_roll);
+   title('Angular Velocity (Roll)');
+   ylim([-extent, extent]);
+   xlabel('Time (s)');
+   ylabel('Angular Velocity (°/s)');
+   hold off
 end

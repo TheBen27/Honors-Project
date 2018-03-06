@@ -19,7 +19,6 @@ mean_x = mean(mean(accel(:,1,:), 3), 1);
 all_pitches = asin(low_x - mean_x) * (180 / pi); % [M x 1 x N]
 all_rolls = atan(-low_z ./ low_y);
 
-% TODO Don't reshape? Premute better?
 dpitch = all_pitches(:);
 dpitch(1) = 0;
 dpitch(2:end) = dpitch(2:end) - dpitch(1:(end-1));
@@ -30,29 +29,34 @@ droll(1) = 0;
 droll(2:end) = droll(2:end) - droll(1:(end-1));
 droll = reshape(droll, size(all_rolls));
 
-% TODO Don't do all this needless permutation
-pitch_mean = permute(mean(all_pitches, 1), [3, 1, 2]);
-pitch_std = permute(std(all_pitches, [], 1), [3, 1, 2]);
-pitch_max = permute(std(all_pitches, [], 1), [3, 1, 2]);
-pitch_min = permute(max(all_pitches, [], 1), [3, 1, 2]);
+ap = permute(all_pitches, [3, 1, 2]); %[n x m]
+pitch_mean = mean(ap, 2);
+pitch_std = std(ap, [], 2);
+pitch_max = max(ap, [], 2);
+pitch_min = min(ap, [], 2);
+pitch_pp = pitch_max - pitch_min;
 
-roll_mean = permute(mean(all_rolls, 1), [3, 1, 2]);
-roll_std = permute(std(all_rolls, [], 1), [3, 1, 2]);
-roll_max = permute(max(all_rolls, [], 1), [3, 1, 2]);
-roll_min = permute(min(all_rolls, [], 1), [3, 1, 2]);
+ar = permute(all_rolls, [3, 1, 2]);
+roll_mean = mean(ar, 2);
+roll_std = std(ar, [], 2);
+roll_max = max(ar, [], 2);
+roll_min = min(ar, [], 2);
+roll_pp = roll_max - roll_min;
 
-dpitch_mean = permute(mean(dpitch, 1), [3, 1, 2]);
-dpitch_max  = permute(max(dpitch,  [], 1), [3, 1, 2]);
-dpitch_min  = permute(min(dpitch, [], 1), [3, 1, 2]);
-dpitch_skew = permute(skewness(dpitch, [], 1), [3, 1, 2]);
+adp = permute(dpitch, [3, 1, 2]);
+dpitch_mean = mean(adp, 2);
+dpitch_max  = max(adp, [], 2);
+dpitch_min  = min(adp, [], 2);
+dpitch_skew = skewness(adp, [], 2);
 
-droll_mean = permute(mean(droll, 1), [3, 1, 2]);
-droll_max  = permute(max(droll,  [], 1), [3, 1, 2]);
-droll_min  = permute(min(droll, [], 1), [3, 1, 2]);
-droll_skew = permute(skewness(droll, [], 1), [3, 1, 2]);
+adr = permute(droll, [3, 1, 2]);
+droll_mean =  mean(adr, 2);
+droll_max  =  max(adr, [], 2);
+droll_min  =  min(adr, [], 2);
+droll_skew =  skewness(adr, [], 2);
 
-out_table = table(pitch_mean, pitch_std, pitch_max, pitch_min, ...
-    roll_mean, roll_std, roll_max, roll_min, ...
+out_table = table(pitch_mean, pitch_std, pitch_max, pitch_min, pitch_pp, ...
+    roll_mean, roll_std, roll_max, roll_min, roll_pp, ...
     dpitch_mean, dpitch_max, dpitch_min, dpitch_skew, ...
     droll_mean, droll_max, droll_min, droll_skew);
 
