@@ -19,8 +19,8 @@ sample_rate = 25;
 %
 % Data at the end of the set that does not fit squarely within a window is
 % cut off.
-window_size = 20;
-window_overlap = 16;
+window_size = 30;
+window_overlap = 15;
 
 % Configuration of the butterworth filter dividing static and
 % dynamic acceleration.
@@ -201,7 +201,7 @@ bootstrap_probabilities = zeros(height(test_features), ...
     length(label_categories), bootstrap_samples);
 bootstrap_predictions = repmat(test_labels(1), height(test_features), bootstrap_samples);
 trainers = {};
-for i=1:bootstrap_samples
+parfor i=1:bootstrap_samples
    disp("Fitting bootstrap " + i + "...");
    trainer = fitcecoc(bootstrap_features{i}, bootstrap_labels{i}, ...
        'FitPosterior', 1, 'Learners', svm_template, ...
@@ -268,11 +268,8 @@ for i=1:length(label_categories)
     % TN = confusion_matrix{all but i, :} = length(test_labels) - tps_and_fns
     % P = sum(confusion_matrix{i, :}) == tps_and_fns
     % N = length(test_labels) - P
-    tp = confusion_matrix{i,i};
-    tn = length(test_labels) - tps_and_fns;
-    p = tps_and_fns;
-    n = length(test_labels) - p;
-    accuracy = accuracy + (tp + tn) / (p + n);
+    tns = length(test_labels) - tps_and_fns;
+    accuracy = accuracy + (tps + tns) / length(test_labels);
 end
 precision = precision / length(label_categories);
 recall = recall / length(label_categories);

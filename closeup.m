@@ -4,7 +4,7 @@
 %% Configuration
 
 % Name of the slice from SLICES.MAT
-slice_name = 'rturn-2';
+slice_name = 'rturn-only';
 
 % Turning these off might result in faster processing.
 plot_raw_accel = false;
@@ -32,8 +32,8 @@ window_overlap = 12;
 % Highpass and lowpass filter controls (for raw accel only)
 accel_filter = false;
 if accel_filter
-   accel_lowpass  = butter(2, (24 / 25), 'low');
-   accel_highpass = butter(2, (1 / 25), 'high'); 
+   accel_lowpass  = butter(2, (24.9 / 25), 'low');
+   accel_highpass = butter(2, (0.1 / 25), 'high'); 
 end
 
 % Precision of the PSD and the spectrograms. For spectrograms, this
@@ -82,8 +82,8 @@ if plot_raw_accel
       accel_filtered = accel;
     end
     % Individual subplots
-    raw_xlims = [times(1), times(end)]; 
-    raw_ylims = [-1.3, 1.3];
+    raw_xlims = [times(1), times(end)];
+    raw_ylims = [-1, 1];
     subplot(3,1,1);
     plot(times,accel_filtered(:,1));
     title('X Acceleration');
