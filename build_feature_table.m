@@ -1,13 +1,18 @@
 %% Build raw feature table from accelerometer data
 function [features] = build_feature_table(...
-    accel, sample_rate, order, cutoff)
+    accel, sample_rate, smooth_time)
 
-    %% Generate data to use in features
-    [low_b, low_a] = butter(order, cutoff / sample_rate);
-    static_accel = filter(low_b, low_a, accel, [], 1);
+    % Use moving average to get static accel
+    % Change time smoothing to frames, go for the closest odd number
+    smooth_frames = 2 * round(smooth_time * sample_rate / 2) + 1;
+    accel_unwrapped = reshape(accel, 1, size(accel,2), ...
+        size(accel,1) * size(accel,3));
+    static_accel_unwrapped = movmean(accel_unwrapped, smooth_frames, 3);
+    static_accel = reshape(static_accel_unwrapped, ...
+        size(accel,1), size(accel,2), size(accel,3));
+    
     dynamic_accel = accel - static_accel;
-
-    %% Make feature table
+    
     disp("Generating features...");
     basic_stats = feature_basic_stats(accel);
     means = feature_means_extreme(accel);

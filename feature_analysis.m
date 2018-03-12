@@ -8,18 +8,24 @@
 % We will then draw a box-and-whiskers chart to show in more detail
 % what this means.
 
-slice_name = {'many-turns', 'medley-1', 'medley-2', 'large-slice', 'small-slice'};
-window_size = 50 - 24;
-window_overlap = 12;
+slice_name = {...
+    'many-turns', 'medley-1', 'medley-2', 'large-slice', 'small-slice', ...
+    'rturn-fun', 'afternoon', 'precise', 'sb34-slice-1'...
+};
+window_size = 30;
+window_overlap = 15;
 
-histogram_title = 'ODBA';
-histogram_bin_width = 0.02;
+histogram_title = 'Lateral Acceleration Histogram';
+histogram_xlabel = 'Acceleration (g''s)';
+histogram_ylabel = '# Occurrences';
+histogram_bin_width = 0.01;
 
 [accel, times, label_times, label_names] = ...
     load_accel_slice_windowed(slice_name, window_size, ...
     window_overlap);
 
-processed = feature_odba(accel);
+processed = feature_means_extreme(accel);
+processed = processed(:,3);
 
 cats = categories(label_names);
 
@@ -31,32 +37,32 @@ for ci=1:length(cats)
 end
 
 % Turning
-f = figure;
-histogram(processed(label_names == 'L-turn'), 20, ...
-    'Normalization', 'probability', 'BinWidth', histogram_bin_width);
-hold on;
-histogram(processed(label_names == 'R-turn'), 20, ...
-    'Normalization', 'probability', 'BinWidth', histogram_bin_width);
-legend({'L-turn', 'R-turn'});
-xlabel('Acceleration (g''s)');
-ylabel('Probability');
-title([histogram_title ' - Turning Behaviors']);
-saveas(f, 'histogram-turning.svg');
-hold off;
+% f = figure;
+% histogram(processed(label_names == 'L-turn'), 20, ...
+%     'Normalization', 'count', 'BinWidth', histogram_bin_width);
+% hold on;
+% histogram(processed(label_names == 'R-turn'), 20, ...
+%     'Normalization', 'count', 'BinWidth', histogram_bin_width);
+% title('');
+% legend({'L-Turn', 'R-Turn'});
+% xlabel(histogram_xlabel);
+% ylabel(histogram_ylabel);
+% title([histogram_title ' - Turning Behaviors']);
+% saveas(f, 'histogram-turning.svg');
+% hold off;
 
 % Clockwise/Anticlockwise
 f = figure;
-histogram(processed(label_names == 'anticlockwise'), 20, ...
-    'Normalization', 'probability', 'BinWidth', histogram_bin_width);
 hold on;
-histogram(processed(label_names == 'clockwise'), 20, ...
-    'Normalization', 'probability', 'BinWidth', histogram_bin_width);
-title('');
+
+[c_bins, edges] = histcounts(processed(label_names == 'clockwise'), 60);
+[a_bins] = histcounts(processed(label_names == 'anticlockwise'), 60);
+line(edges(1:end-1), [c_bins ; a_bins]);
+title(histogram_title);
 legend({'Counterclockwise', 'Clockwise'});
-xlabel('Acceleration (g''s)');
-ylabel('Probability');
+xlabel(histogram_xlabel);
+ylabel(histogram_ylabel);
 title([histogram_title ' - Non-Turning Behaviors']);
-saveas(f, 'histogram-straight.svg');
 hold off;
 
 % ANOVA and Box-and-Whiskers

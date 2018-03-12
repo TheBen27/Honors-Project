@@ -22,13 +22,11 @@ sample_rate = 25;
 window_size = 30;
 window_overlap = 15;
 
-% Configuration of the butterworth filter dividing static and
-% dynamic acceleration.
-static_filter_order = 3;
-static_filter_cutoff = 0.6;
+% Time of the moving-average filter
+smooth_time = 3;
 
 % The cost of classifying a point into class j if its true class is i
-classifier_cost = ones(4) - eye(4);
+%classifier_cost = ones(4) - eye(4);
 %~classifier_cost = ...
 %~    ... L    R    A    C (Predicted class)
 %~    [   0, 0.2,   5,   5; ... % L (Actual classs)
@@ -41,15 +39,15 @@ optimization_mode = 'none';
 % Only include certain features
 feature_whitelist = true;
 included_features = {...
-	'distinctiveness_y', ...
-	'std_x', ...
-	'std_y', ...
-	'min_x', ...
-	'max_z', ...
-	'energy_x', ...
-	'cor_xy', ...
-	'min_y', ...
-	'frequency_y' ...
+    'distinctiveness_y', ...
+    'std_x', ...
+    'std_y', ...
+    'min_x', ...
+    'max_z', ...
+    'energy_x', ...
+    'cor_xy', ...
+    'min_y', ...
+    'frequency_y'...
 };
 
 
@@ -101,8 +99,7 @@ undersample_straight_swimming = true;
 [accel, times, label_times, label_names, label_categories] = ... 
     load_accel_slice_windowed(slice_name, window_size, window_overlap);
 
-raw_features = build_feature_table(accel, sample_rate, ...
-    static_filter_order, static_filter_cutoff);
+raw_features = build_feature_table(accel, sample_rate, smooth_time);
 
 writetable([raw_features, table(label_names)], "Features/features-raw.csv");
 
@@ -254,31 +251,43 @@ end
 disp('Columns are predicted, rows actual');
 disp(confusion_matrix);
 
-precision = 0.0;
-recall = 0.0;
-accuracy = 0.0;
+% Macro-averages and micro-averages
+macro_precision = 0.0;
+macro_recall = 0.0;
+macro_accuracy = 0.0;
+
+total_tps = 0;
+total_tps_and_fps = 0;
+total_tps_and_fns = 0;
+total_tns = 0;
 for i=1:length(label_categories)
     tps = confusion_matrix{i,i};
     tps_and_fps = sum(confusion_matrix{:,i});
     tps_and_fns = sum(confusion_matrix{i,:});
-    precision = precision + tps / tps_and_fps;
-    recall = recall + tps / tps_and_fns;
-    %accuracy = (TP + TN) / (P + N)
-    % TP = confusion_matrix{i,i};
-    % TN = confusion_matrix{all but i, :} = length(test_labels) - tps_and_fns
-    % P = sum(confusion_matrix{i, :}) == tps_and_fns
-    % N = length(test_labels) - P
-    tns = length(test_labels) - tps_and_fns;
-    accuracy = accuracy + (tps + tns) / length(test_labels);
+    tns = length(test_labels) - tps_and_fns - (tps_and_fps - tps);
+    
+    macro_precision = macro_precision + tps / tps_and_fps;
+    macro_recall = macro_recall + tps / tps_and_fns;
+    macro_accuracy = macro_accuracy + (tps + tns) / length(test_labels);
+    
+    total_tps = total_tps + tps;
+    total_tps_and_fps = total_tps_and_fps + tps_and_fps;
+    total_tps_and_fns = total_tps_and_fns + tps_and_fns;
+    total_tns = total_tns + tns;
 end
-precision = precision / length(label_categories);
-recall = recall / length(label_categories);
-accuracy = accuracy / length(label_categories);
+macro_precision = macro_precision / length(label_categories);
+macro_recall = macro_recall / length(label_categories);
+macro_accuracy = macro_accuracy / length(label_categories);
 
-disp("Macro-Averages");
-disp("Precision: " + precision);
-disp("Recall: " + recall);
-disp("Accuracy: " + accuracy);
+micro_precision = total_tps / total_tps_and_fps;
+micro_recall = total_tps / total_tps_and_fns;
+micro_accuracy = (total_tps + total_tns) / length(test_labels);
+
+performance = table([macro_precision ; macro_recall ; macro_accuracy], ...
+                    [micro_precision ; micro_recall ; micro_accuracy], ...
+                    'VariableNames', {'macro', 'micro'}, ...
+                    'RowNames', {'Precision', 'Recall', 'Accuracy'});
+disp(performance);
 
 %% Plot ROC Curves
 % An ROC curve for a given class plots TP rate against FP rate for various
