@@ -26,7 +26,7 @@ window_overlap = 15;
 smooth_time = 3;
 
 % The cost of classifying a point into class j if its true class is i
-%classifier_cost = ones(4) - eye(4);
+classifier_cost = ones(4) - eye(4);
 %~classifier_cost = ...
 %~    ... L    R    A    C (Predicted class)
 %~    [   0, 0.2,   5,   5; ... % L (Actual classs)

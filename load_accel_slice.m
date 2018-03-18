@@ -96,7 +96,11 @@ for ki=1:length(ks)
     disp([k, ': ', char(dur), ' (', num2str(100 * dur / total_duration), '%)']);
 end
 
-cat_freqs = label_durations.values;
- 
+cat_freqs_cell = label_durations.values;
+cat_freqs = repmat(duration, length(cat_freqs_cell), 1);
+for ci=1:length(cat_freqs_cell)
+    cat_freqs(ci) = cat_freqs_cell{ci};
+end
+
 end
 
