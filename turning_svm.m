@@ -87,6 +87,8 @@ smote_k = 6;
 smote_amt = 3;
 minor_ratio = 0.8;
 major_ratio = 1.0;
+balance_major = true;
+balance_minor = true;
 
 if strcmp(resampling_method, 'none')
    bootstrap_samples = 1; 
@@ -171,7 +173,7 @@ if ~strcmp(resampling_method, 'none')
            [bootstrap_features{bs}, bootstrap_labels{bs}] = ...
                 resample_feature_table(training_features, training_labels, ...
                 bootstrap_minority_classes, smote_amt, smote_k, ...
-                minor_ratio, major_ratio); 
+                minor_ratio, major_ratio, balance_major, balance_minor); 
         elseif strcmp(resampling_method, 'bootstrap')
            [bootstrap_features{bs}, bootstrap_labels{bs}] = ...
                make_bootstrap_sample(training_features, training_labels, ...
