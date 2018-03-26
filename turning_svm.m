@@ -87,8 +87,8 @@ smote_k = 6;
 smote_amt = 3;
 minor_ratio = 0.8;
 major_ratio = 1.0;
-balance_major = true;
-balance_minor = true;
+balance_major = false;
+balance_minor = false;
 
 if strcmp(resampling_method, 'none')
    bootstrap_samples = 1; 
