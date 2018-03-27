@@ -1,3 +1,4 @@
+function [confusion_matrix, performance, auc] = turning_svm(varargin)
 %% Simple SVM for Turning Detection
 % A multiclass SVM for detecting turning.
 % ... Well, it used to be simple, anyway.
@@ -37,7 +38,7 @@ classifier_cost = ones(4) - eye(4);
 optimization_mode = 'none';
 
 % Only include certain features
-feature_whitelist = true;
+feature_whitelist = false;
 included_features = {...
     'distinctiveness_y', ...
     'std_x', ...
@@ -94,74 +95,125 @@ if strcmp(resampling_method, 'none')
    bootstrap_samples = 1; 
 end
 
-undersample_straight_swimming = true;
+%% Custom configuration options
 
+if ~exist('varargin', 'var')
+   varargin = [];
+   nargin = 0;
+end
 
-%% Load and preprocess data
-[accel, times, label_times, label_names, label_categories] = ... 
-    load_accel_slice_windowed(slice_name, window_size, window_overlap);
+show_plots = true;
 
-raw_features = build_feature_table(accel, sample_rate, smooth_time);
+use_custom_data = false;
+custom_training_features = [];
+custom_training_labels = [];
+custom_test_features = [];
+custom_test_labels = [];
+custom_label_categories = [];
 
-writetable([raw_features, table(label_names)], "Features/features-raw.csv");
+for pair_i = 1:2:length(varargin)
+    k = varargin(pair_i);
+    v = varargin(pair_i + 1);
+    k = k{1};
+    v = v{1};
+    
+    switch k
+        case 'show_plots'
+            show_plots = v;
+        case 'feature_whitelist'
+            feature_whitelist = v;
+        case 'use_custom_data'
+            use_custom_data = v;
+        case 'training_features'
+            custom_training_features = v;
+        case 'training_labels'
+            custom_training_labels = v;
+            custom_label_categories = categories(v);
+        case 'test_features'
+            custom_test_features = v;
+        case 'test_labels'
+            custom_test_labels = v;
+        otherwise
+            error("Key " + k + " is not an accepted parameter");
+    end
+end
 
-features = table();
-
-if feature_whitelist
-    for wi=1:length(included_features)
-       inc_feat = included_features{wi};
-       features.(inc_feat) = raw_features.(inc_feat);
-   end
+if use_custom_data
+    training_features = custom_training_features;
+    training_labels = custom_training_labels;
+    test_features = custom_test_features;
+    test_labels = custom_test_labels;
+    label_categories = custom_label_categories;
 else
-   features = raw_features;
+    %% Load and preprocess data (skip if using custom data)
+    [accel, times, label_times, label_names, label_categories] = ... 
+        load_accel_slice_windowed(slice_name, window_size, window_overlap);
+
+    raw_features = build_feature_table(accel, sample_rate, smooth_time);
+
+    writetable([raw_features, table(label_names)], "Features/features-raw.csv");
+
+    features = table();
+
+    if feature_whitelist
+       for wi=1:length(included_features)
+           inc_feat = included_features{wi};
+           features.(inc_feat) = raw_features.(inc_feat);
+       end
+    else
+       features = raw_features;
+    end
+
+    % PCA
+    if use_pca
+       features_arr = table2array(features);
+       [coeff, score, latent] = pca(features_arr);
+       nfeats = find(latent < pca_threshold, 1) - 1;
+       features = array2table(features_arr * coeff(:, 1:nfeats));
+       %disp("After PCA, has " + nfeats + " features");
+    end
+
+    %% Split and Preprocess Data (skip if custom)
+    %disp("Generating sample sets...");
+    % Shuffle features/labels to randomize training set and test set
+    rand_inds = randperm(height(features));
+    r_features = features(rand_inds, :);
+    r_labels = label_names(rand_inds);
+
+    % Split into training set and test set
+    training_size = floor(length(label_names) * training_set_portion);
+    training_features = r_features(1:training_size, :);
+    training_labels   = r_labels(1:training_size, :);
+    test_features = r_features((1 + training_size):length(label_names), :);
+    test_labels   = r_labels((1 + training_size):length(label_names), :);
+
+    assert(height(training_features) + height(test_features) == length(label_names));
+
+    % Standardize variables - use Training Set's mean and std. dev.
+    training_mean = mean(training_features{:,:});
+    training_std = std(training_features{:,:});
+
+    training_features{:,:} = (training_features{:,:} - training_mean) ./ training_std;
+    test_features{:,:} = (test_features{:,:} - training_mean) ./ training_std;
+
+    % If the standard deviation of any column is 0, we get zerodiv errors
+    if any(training_std == 0)
+        warning("One of your features has a standard deviation of 0. Standardizing to 0...");
+        training_features{:, training_std == 0} = 0;
+        test_features{:, training_std == 0} = 0;
+    end
+
+    % Save features
+    writetable([training_features, table(training_labels)], ...
+                "Features/training-standard.csv");
+    writetable([test_features, table(test_labels, ...
+                'VariableNames', {'training_labels'})], ...
+                "Features/test-standard.csv");
 end
 
-% PCA
-if use_pca
-   features_arr = table2array(features);
-   [coeff, score, latent] = pca(features_arr);
-   nfeats = find(latent < pca_threshold, 1) - 1;
-   features = array2table(features_arr * coeff(:, 1:nfeats));
-   disp("After PCA, has " + nfeats + " features");
-end
 
-%% Split and Preprocess Data
-disp("Generating sample sets...");
-% Shuffle features/labels to randomize training set and test set
-rand_inds = randperm(height(features));
-r_features = features(rand_inds, :);
-r_labels = label_names(rand_inds);
-
-% Split into training set and test set
-training_size = floor(length(label_names) * training_set_portion);
-training_features = r_features(1:training_size, :);
-training_labels   = r_labels(1:training_size, :);
-test_features = r_features((1 + training_size):length(label_names), :);
-test_labels   = r_labels((1 + training_size):length(label_names), :);
-
-assert(height(training_features) + height(test_features) == length(label_names));
-
-% Standardize variables - use Training Set's mean and std. dev.
-training_mean = mean(training_features{:,:});
-training_std = std(training_features{:,:});
-
-training_features{:,:} = (training_features{:,:} - training_mean) ./ training_std;
-test_features{:,:} = (test_features{:,:} - training_mean) ./ training_std;
-
-% If the standard deviation of any column is 0, we get zerodiv errors
-if any(training_std == 0)
-    warning("One of your features has a standard deviation of 0. Standardizing to 0...");
-    training_features{:, training_std == 0} = 0;
-    test_features{:, training_std == 0} = 0;
-end
-
-% Save features
-writetable([training_features, table(training_labels)], ...
-            "Features/training-standard.csv");
-writetable([test_features, table(test_labels, ...
-            'VariableNames', {'training_labels'})], ...
-            "Features/test-standard.csv");
-
+%% Resample data
+        
 % Create bootstrap samples for classifiers
 % Matlab does not support 3D tables, so we will use cell arrays instead
 if ~strcmp(resampling_method, 'none')
@@ -187,21 +239,21 @@ else
     bootstrap_labels = {training_labels};
 end
 
-disp("Bootstrap sample amounts:");
+%disp("Bootstrap sample amounts:");
 for ci=1:length(label_categories)
     cat = label_categories{ci};
-    disp(cat + ": " + sum(bootstrap_labels{1} == cat));
+    %disp(cat + ": " + sum(bootstrap_labels{1} == cat));
 end
 
 %% Generate classifier
-disp("Training classifiers...");
+%disp("Training classifiers...");
 
 bootstrap_probabilities = zeros(height(test_features), ...
     length(label_categories), bootstrap_samples);
 bootstrap_predictions = repmat(test_labels(1), height(test_features), bootstrap_samples);
 trainers = {};
 parfor i=1:bootstrap_samples
-   disp("Fitting bootstrap " + i + "...");
+   %disp("Fitting bootstrap " + i + "...");
    trainer = fitcecoc(bootstrap_features{i}, bootstrap_labels{i}, ...
        'FitPosterior', 1, 'Learners', svm_template, ...
        'OptimizeHyperparameters', optimization_mode, ...
@@ -250,8 +302,11 @@ for actual_i=1:length(label_categories)
        confusion_matrix{actual_i,predicted_i} = matches;
    end
 end
-disp('Columns are predicted, rows actual');
-disp(confusion_matrix);
+
+if show_plots
+    %disp('Columns are predicted, rows actual');
+    %disp(confusion_matrix);
+end
 
 % Macro-averages and micro-averages
 macro_precision = 0.0;
@@ -289,7 +344,9 @@ performance = table([macro_precision ; macro_recall ; macro_accuracy], ...
                     [micro_precision ; micro_recall ; micro_accuracy], ...
                     'VariableNames', {'macro', 'micro'}, ...
                     'RowNames', {'Precision', 'Recall', 'Accuracy'});
-disp(performance);
+if show_plots
+    %disp(performance);
+end
 
 %% Plot ROC Curves
 % An ROC curve for a given class plots TP rate against FP rate for various
@@ -353,25 +410,27 @@ true_positive_rate = true_positives ./ (true_positives + false_negatives);
 % negatives detected
 false_positive_rate = false_positives ./ (false_positives + true_negatives);
 
-% Plot individual ROC Curves
-hold on
-stairs(false_positive_rate, true_positive_rate);
-plot([0,1], [0,1],'--');
-legend(label_categories, 'Location', 'southeast');
-xlabel("False Positive Rate");
-ylabel("True Positive Rate");
-hold off
+if show_plots
+   % Plot individual ROC Curves
+    hold on
+    stairs(false_positive_rate, true_positive_rate);
+    plot([0,1], [0,1],'--');
+    legend(label_categories, 'Location', 'southeast');
+    xlabel("False Positive Rate");
+    ylabel("True Positive Rate");
+    hold off
 
-% Plot macro-average ROC curve
-mean_false_positive_rate = mean(false_positive_rate, 2);
-mean_true_positive_rate = mean(true_positive_rate, 2);
-hold on
-stairs(mean_false_positive_rate, mean_true_positive_rate);
-plot([0,1], [0,1], '--');
-title("Macro-Average ROC");
-xlabel("False Positive Rate");
-ylabel("True Positive Rate");
-hold off
+    % Plot macro-average ROC curve
+    mean_false_positive_rate = mean(false_positive_rate, 2);
+    mean_true_positive_rate = mean(true_positive_rate, 2);
+    hold on
+    stairs(mean_false_positive_rate, mean_true_positive_rate);
+    plot([0,1], [0,1], '--');
+    title("Macro-Average ROC");
+    xlabel("False Positive Rate");
+    ylabel("True Positive Rate");
+    hold off 
+end
 
 %% Area Under Curve Calculations
 % The area under the ROC curve represents "discrimination" - the chance
@@ -386,9 +445,11 @@ next_fp = false_positive_rate(2:length(false_positive_rate), :);
 next_fp(length(next_fp)+1, :) = 1;
 
 auc = sum(true_positive_rate .* (false_positive_rate - next_fp));
-disp("AUROCs");
-disp("======");
-for i=1:length(label_categories)
-   cat = label_categories{i};
-   disp(cat + ": " + auc(i));
+if show_plots
+   %disp("AUROCs");
+    %disp("======");
+    for i=1:length(label_categories)
+       cat = label_categories{i};
+       %disp(cat + ": " + auc(i));
+    end 
 end

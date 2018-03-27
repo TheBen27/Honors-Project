@@ -83,13 +83,13 @@ new_features = new_features(shuffled, :);
 new_labels = new_labels(shuffled);
 
 % Debug prints
-disp("Total sample size: " + height(new_features));
-disp("Majority samples: " + height(major_features));
-disp("Minority samples: " + height(minor_features));
+%disp("Total sample size: " + height(new_features));
+%disp("Majority samples: " + height(major_features));
+%disp("Minority samples: " + height(minor_features));
 
 label_cats = categories(labels);
 for ci=1:length(label_cats)
-    disp(label_cats{ci} + ": " + sum(label_cats{ci} == new_labels));
+    %disp(label_cats{ci} + ": " + sum(label_cats{ci} == new_labels));
 end
 
 assert(height(major_features) == length(major_labels));
