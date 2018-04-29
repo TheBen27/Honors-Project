@@ -1,10 +1,8 @@
 # Sharkduino Data Analysis (Honors Project)
 
-The goal of this project is to determine the behavior of sharks by
-looking at their accelerometer and gyroscope data. This document is a
-"getting started" guide for someone who has chosen, or been chosen, to
-help me with this, including a version of me from the far future who
-forgot that this existed.
+The goal of this project is to determine if a sandbar shark is turning
+by looking at accelerometer data. A desktop app for non-technical users
+is in development at [this repository](https://github.com/TheBen27/Shark-Turning-App).
 
 ## Setup
 
@@ -32,7 +30,7 @@ when loading chunks of data via `load_accel_slice.m` or
 
 Due to space considerations, most of the raw data for this project
 (barring the labels) is not in this repository. The raw accelerometer
-data and video data are available from Dan Crear and are backed up on
+data and video data are available from Dan Crear at VIMS and are backed up on
 both my laptop and backup hard drives.
 
 The "Accelerometer" folder contains the raw data, and is used by the
