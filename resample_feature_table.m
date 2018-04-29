@@ -31,6 +31,17 @@ minor_inds = minor_inds(randperm(length(minor_inds), n_minors));
 minor_features = features(minor_inds, :);
 minor_labels = labels(minor_inds);
 
+% Smote each minority class separately
+for ci=1:length(minority_classes)
+   c = minority_classes{ci};
+   cf = features(minor_labels == c, :);
+   new_features = smote(cf, smote_k, smote_amt);
+   minor_features = [minor_features ; new_features];
+   
+   new_labels = categorical(repmat(cellstr(c), height(new_features), 1));
+   minor_labels = [minor_labels ; new_labels];
+end
+
 if balance_minor
     % Downsample minority classes to smallest class size
     min_minority_samples = 2^64;
@@ -49,17 +60,6 @@ if balance_minor
     end
     minor_features(to_remove, :) = [];
     minor_labels(to_remove, :) = [];
-end
-
-% Smote each minority class separately
-for ci=1:length(minority_classes)
-   c = minority_classes{ci};
-   cf = features(minor_labels == c, :);
-   new_features = smote(cf, smote_k, smote_amt);
-   minor_features = [minor_features ; new_features];
-   
-   new_labels = categorical(repmat(cellstr(c), height(new_features), 1));
-   minor_labels = [minor_labels ; new_labels];
 end
 
 % Pull majority samples with replacement, ensuring balance
